@@ -16,6 +16,7 @@
 
 const { execFile } = require('node:child_process');
 const { rcloneExe } = require('./paths');
+const presets = require('./presets');
 const log = require('./logger').scoped('backends');
 
 /**
@@ -140,6 +141,62 @@ function readProviders() {
  * not in the main form. `Hide` is rclone's own marker for options that should
  * never be shown, so those are dropped entirely.
  */
+/**
+ * Options this app treats as advanced regardless of what rclone says.
+ *
+ * `env_auth` tells rclone to take credentials from environment variables or
+ * instance metadata instead of asking. That is a server-side deployment
+ * choice; on a desktop, where the whole point of the form is to collect
+ * credentials, offering it first only invites a drive that cannot
+ * authenticate.
+ */
+const FORCE_ADVANCED = new Set(['env_auth']);
+
+/**
+ * Fields that identify *where* the storage is and *who* you are.
+ *
+ * rclone's own `Advanced` flag is written for a config tool that walks you
+ * through every option, so it leaves things like ACLs, location constraints
+ * and object-lock defaults in the basic set. None of those are needed to
+ * mount a drive, and each one is another box between the user and a working
+ * connection.
+ *
+ * So the basic form keeps three kinds of field and pushes the rest behind
+ * "more options": what rclone marks as required, anything holding a
+ * credential, and the handful below that name the server or the account.
+ */
+const CONNECTION_FIELDS = new Set([
+  'provider',
+  'vendor',
+  'endpoint',
+  'url',
+  'host',
+  'port',
+  'region',
+  'user',
+  'username',
+  'account',
+  'domain',
+  'share',
+  'access_key_id',
+  'secret_access_key',
+  'key',
+  'pass',
+  'password',
+  'key_file',
+  'token',
+]);
+
+/** Is this field part of the minimum needed to connect? */
+function isEssential(option) {
+  if (FORCE_ADVANCED.has(option.Name)) return false;
+  return (
+    Boolean(option.Required) ||
+    Boolean(option.IsPassword) ||
+    CONNECTION_FIELDS.has(option.Name)
+  );
+}
+
 function toField(option) {
   const examples = Array.isArray(option.Examples) ? option.Examples : [];
 
@@ -149,11 +206,16 @@ function toField(option) {
     help: firstLine(option.Help),
     type: option.Type,
     required: Boolean(option.Required),
-    advanced: Boolean(option.Advanced),
+    advanced: Boolean(option.Advanced) || !isEssential(option),
     // IsPassword means rclone stores it obscured and rejects it in clear text.
     secret: Boolean(option.IsPassword),
     // Sensitive is weaker: shown masked, stored as-is.
     sensitive: Boolean(option.Sensitive),
+    // Which providers the option applies to. rclone states this itself: an
+    // empty value means every provider, a list restricts it, and a list
+    // starting with "!" excludes instead of includes. It is why an IBM API
+    // key does not belong on a Wasabi form.
+    providers: String(option.Provider || ''),
     default: option.DefaultStr === '' ? null : option.DefaultStr,
     // Exclusive says the examples are the only valid values, so the field is a
     // closed list. Otherwise they are suggestions and free text is allowed.
@@ -197,6 +259,8 @@ async function catalogue() {
         order: FEATURED.indexOf(provider.Name),
         needsOAuth: NEEDS_OAUTH.has(provider.Name),
         root: ROOT_FIELD[provider.Name] || null,
+        // Known services for this type, each with its own addresses.
+        presets: presets.forType(provider.Name),
         fields,
       };
     })

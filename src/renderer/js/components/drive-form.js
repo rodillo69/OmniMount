@@ -49,6 +49,8 @@ OM.driveForm = (() => {
       reuseConnection: false,
       showAdvanced: false,
       search: '',
+      presetId: '',
+      regionId: '',
       letters: [],
       busy: false,
       error: null,
@@ -81,6 +83,63 @@ OM.driveForm = (() => {
 
     function setValue(name, value) {
       state.values[name] = value;
+    }
+
+    /**
+     * Fields a preset controls, hidden from the form.
+     *
+     * Showing an endpoint box that the region selector overwrites invites
+     * someone to edit it and wonder why their value disappears.
+     */
+    function hiddenByPreset() {
+      if (!state.presetId) return [];
+      const b = backend();
+      const preset = (b.presets || []).find((p) => p.id === state.presetId);
+      if (!preset) return [];
+      const names = Object.keys(preset.config || {});
+      if (preset.regions.length) names.push('endpoint');
+      return names;
+    }
+
+    /** Fields the provider dropdown governs, so they never appear twice. */
+    function governedFields() {
+      const b = backend();
+      const names = b.fields.some((f) => f.name === 'provider') ? ['provider'] : [];
+      return names.concat(hiddenByPreset());
+    }
+
+    /**
+     * Apply whichever provider was chosen.
+     *
+     * A `preset:` value is one of ours and carries addresses; anything else
+     * is a value rclone understands for its own `provider` option.
+     */
+    function chooseProvider(value) {
+      const b = backend();
+      if (!b) return;
+
+      if (!value.startsWith('preset:')) {
+        state.presetId = '';
+        state.regionId = '';
+        state.values.provider = value;
+        return;
+      }
+
+      const preset = (b.presets || []).find((p) => `preset:${p.id}` === value);
+      if (!preset) return;
+
+      state.presetId = preset.id;
+      state.regionId = '';
+      Object.assign(state.values, preset.config);
+      if (preset.regions.length) applyRegion(preset, preset.regions[0].id);
+    }
+
+    function applyRegion(preset, regionId) {
+      const region = preset.regions.find((r) => r.id === regionId) || preset.regions[0];
+      if (!region) return;
+      state.regionId = region.id;
+      state.values.endpoint = region.endpoint;
+      if (region.region) state.values.region = region.region;
     }
 
     /* ------------------------------------------------------- step one */
@@ -182,7 +241,74 @@ OM.driveForm = (() => {
           ])
         );
       } else {
-        rows.push(...fields.render(b, state.values, setValue));
+        // One provider list, not two. Services with known addresses sit in
+        // the same dropdown as the ones rclone names, because to the person
+        // filling the form they are the same kind of answer: "who hosts my
+        // storage". Choosing one with known addresses fills the endpoint;
+        // choosing any other just sets rclone's dialect and asks for a URL.
+        const providerSpec = b.fields.find((f) => f.name === 'provider');
+        if ((b.presets || []).length || providerSpec) {
+          const options = [
+            ...(b.presets || []).map((p) => ({ value: `preset:${p.id}`, label: p.label })),
+            ...((providerSpec && providerSpec.options) || []).map((o) => ({
+              value: o.value,
+              label: o.label,
+            })),
+          ];
+
+          const selected = state.presetId
+            ? `preset:${state.presetId}`
+            : state.values.provider || '';
+
+          const providerSelect = h(
+            'select.select',
+            {
+              onchange: (e) => {
+                chooseProvider(e.target.value);
+                paint();
+              },
+            },
+            [
+              h('option', { value: '' }, t('form.providerPick')),
+              ...options.map((o) => h('option', { value: o.value }, o.label)),
+            ]
+          );
+          // Set the value on the element rather than marking an <option>:
+          // with a value that matches nothing the browser falls back to the
+          // first entry, which silently pre-selects a provider nobody chose.
+          providerSelect.value = options.some((o) => o.value === selected) ? selected : '';
+
+          rows.push(
+            field(t('form.provider'), providerSelect, {
+              required: true,
+              hint: t('form.providerHint'),
+            })
+          );
+
+          const preset = (b.presets || []).find((p) => p.id === state.presetId);
+          if (preset && preset.regions.length) {
+            rows.push(
+              field(
+                t('form.region'),
+                h(
+                  'select.select',
+                  {
+                    onchange: (e) => {
+                      applyRegion(preset, e.target.value);
+                      paint();
+                    },
+                  },
+                  preset.regions.map((r) =>
+                    h('option', { value: r.id, selected: r.id === state.regionId }, r.label)
+                  )
+                ),
+                { required: true, hint: t('form.regionHint') }
+              )
+            );
+          }
+        }
+
+        rows.push(...fields.render(b, state.values, setValue, { skip: governedFields() }));
       }
 
       // The container that becomes the root of the drive.
@@ -231,7 +357,10 @@ OM.driveForm = (() => {
 
       // Advanced options exist for every backend and are genuinely advanced,
       // so they stay folded away.
-      const adv = fields.advanced(b);
+      // Count only what actually applies to the chosen provider, or the
+      // disclosure promises options that are not there when opened.
+      const provider = state.values.provider || '';
+      const adv = fields.advanced(b).filter((f) => fields.appliesTo(f, provider));
       if (adv.length) {
         rows.push(
           h('details.moreopts', [
@@ -251,7 +380,7 @@ OM.driveForm = (() => {
       state.error = null;
 
       if (!state.reuseConnection) {
-        const gaps = fields.missing(b, state.values);
+        const gaps = fields.missing(b, state.values, governedFields());
         if (gaps.length) {
           state.error = t('form.required', { fields: gaps.join(', ') });
           return paint();

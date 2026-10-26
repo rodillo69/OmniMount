@@ -1294,3 +1294,10 @@
   color: var(--fn-error);
   font-size: var(--fs-sm);
 }
+
+/* A select with a free-text box underneath, for "Other…". */
+.field__stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
