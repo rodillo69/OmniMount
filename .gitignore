@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+out/
+*.asar
+
+# Bundled binaries fetched at build or first run
+build/vendor/
+
+# Logs and local state
+*.log
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Secrets — nothing of the sort belongs in this repository
+.env
+.env.*
+*.pem
+*.pfx
+
+# Local working notes, never published
+CLAUDE.md
+.omnimount-notas.md
+AGENTS.md
+.claude/

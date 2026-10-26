@@ -1,0 +1,12 @@
+# Normalise line endings so the tree is identical on Windows, macOS and Linux
+* text=auto eol=lf
+
+# Binary assets must never be converted
+*.png binary
+*.jpg binary
+*.ico binary
+*.icns binary
+*.ttf binary
+*.woff2 binary
+*.msi binary
+*.exe binary
