@@ -29,7 +29,7 @@
       ]),
       h(
         'button.toast__close',
-        { type: 'button', title: 'Cerrar', onclick: () => dismiss(node) },
+        { type: 'button', title: t('toast.cerrar'), onclick: () => dismiss(node) },
         icon('x', 14)
       ),
     ]);

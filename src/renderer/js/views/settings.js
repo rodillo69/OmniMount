@@ -8,9 +8,9 @@
   const modal = global.OM.modal;
 
   const THEMES = [
-    { key: 'system', label: 'Sistema' },
-    { key: 'light', label: 'Claro' },
-    { key: 'dark', label: 'Oscuro' },
+    { key: 'system', label: t('settings.sistema') },
+    { key: 'light', label: t('settings.claro') },
+    { key: 'dark', label: t('settings.oscuro') },
   ];
 
   function app() {
@@ -24,9 +24,9 @@
     return h('div.view__inner', [
       h('header.view__header', [
         h('div.view__heading', [
-          h('div.kicker', 'Preferencias'),
-          h('h1.view__title', 'Ajustes'),
-          h('p.view__sub', 'Comportamiento de OmniMount en este equipo.'),
+          h('div.kicker', t('settings.preferencias')),
+          h('h1.view__title', t('settings.ajustes')),
+          h('p.view__sub', t('settings.comportamientoDeOmnimountEn')),
         ]),
       ]),
 
@@ -50,13 +50,13 @@
 
         card('Arranque', 'Qué hace la aplicación al iniciarse y al cerrarla.', [
           switchRow('Iniciar con Windows', settings.autostart, (v) => update({ autostart: v }), {
-            hint: 'Las unidades estarán disponibles nada más encender el equipo.',
+            hint: t('settings.lasUnidadesEstaranDisponibles'),
           }),
           switchRow(
             'Arrancar en segundo plano',
             settings.startMinimized,
             (v) => update({ startMinimized: v }),
-            { hint: 'Sin abrir la ventana. Sólo aplica al iniciar con Windows.' }
+            { hint: t('settings.sinAbrirLaVentana') }
           ),
           switchRow(
             'Montar las unidades automáticas al abrir',
@@ -69,7 +69,7 @@
             (v) => update({ closeToTray: v }),
             {
               hint:
-                'Recomendado: las unidades siguen funcionando. Si lo desactivas, cerrar la ventana las desmonta.',
+                t('settings.recomendadoLasUnidadesSiguen'),
             }
           ),
           switchRow(
@@ -139,7 +139,7 @@
                   'button.btn.btn--ghost.btn--icon.btn--sm.tooltip',
                   {
                     type: 'button',
-                    'data-tip': 'Eliminar',
+                    'data-tip': t('settings.eliminar'),
                     onclick: () => removeKey(conn, usedBy),
                   },
                   icon('trash', 15)
@@ -156,10 +156,10 @@
 
   async function replaceKey(conn, button) {
     const secret = await modal.prompt({
-      title: 'Cambiar la Secret Key',
+      title: t('settings.cambiarLaSecretKey'),
       description: `Para la Access Key ${conn.accessKeyId}.`,
-      label: 'Nueva Secret Key',
-      placeholder: 'Secret Key',
+      label: t('settings.nuevaSecretKey'),
+      placeholder: t('settings.secretKey'),
     });
     if (!secret) return;
 
@@ -183,10 +183,10 @@
       return;
     }
     const confirmed = await modal.confirm({
-      title: '¿Eliminar estas claves?',
+      title: t('settings.eliminarEstasClaves'),
       message: `Se borrará la Access Key ${conn.accessKeyId} de este equipo.`,
-      detail: 'No afecta a los datos del almacenamiento remoto.',
-      confirmLabel: 'Eliminar',
+      detail: t('settings.noAfectaALos'),
+      confirmLabel: t('settings.eliminar'),
       danger: true,
     });
     if (!confirmed) return;
@@ -333,7 +333,7 @@
         ]),
       ]),
       h('div.setting__control', [
-        h('button.btn.btn--outline.btn--sm', { type: 'button', onclick: handler }, 'Abrir'),
+        h('button.btn.btn--outline.btn--sm', { type: 'button', onclick: handler }, t('settings.abrir')),
       ]),
     ]);
   }
@@ -385,15 +385,15 @@
       ]),
       h('div.card__body', [
         h('dl.about-grid', [
-          h('dt', 'Versión'),
+          h('dt', t('settings.version')),
           h('dd', info.version || '—'),
-          h('dt', 'Regiones'),
+          h('dt', t('settings.connections')),
           h('dd', (info.regions || []).map((r) => `${r.name}: ${r.endpoint}`).join('  ·  ') || '—'),
-          h('dt', 'Motor de transferencia'),
+          h('dt', t('settings.motorDeTransferencia')),
           h('dd', info.rcloneVersion ? `rclone ${info.rcloneVersion}` : 'no instalado'),
-          h('dt', 'Plataforma'),
+          h('dt', t('settings.plataforma')),
           h('dd', `Electron ${info.electron || '—'} · ${info.platform || ''}`),
-          h('dt', 'Cifrado de credenciales'),
+          h('dt', t('settings.cifradoDeCredenciales')),
           h('dd', info.encryptionAvailable ? 'DPAPI de Windows' : 'no disponible'),
         ]),
       ]),

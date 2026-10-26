@@ -38,8 +38,8 @@
     mount(container, [
       h('header.view__header', [
         h('div.view__heading', [
-          h('div.kicker', 'almacenamiento remoto'),
-          h('h1.view__title', 'Unidades'),
+          h('div.kicker', t('drives.almacenamientoRemoto')),
+          h('h1.view__title', t('drives.unidades')),
           h(
             'p.view__sub',
             mounts.length
@@ -52,13 +52,13 @@
             ? h(
                 'button.btn.btn--outline',
                 { type: 'button', onclick: (e) => mountAll(e.currentTarget) },
-                [icon('power', 16, 'btn__icon'), h('span', 'Montar todas')]
+                [icon('power', 16, 'btn__icon'), h('span', t('drives.montarTodas'))]
               )
             : null,
           h(
             'button.btn.btn--primary',
             { type: 'button', onclick: () => global.OM.driveForm.open() },
-            [icon('plus', 16, 'btn__icon'), h('span', 'Nueva unidad')]
+            [icon('plus', 16, 'btn__icon'), h('span', t('drives.nuevaUnidad'))]
           ),
         ]),
       ]),
@@ -107,7 +107,7 @@
     );
 
     mount(summaryNode, [
-      statTile('Unidades', String(summary.total), null, 'configuradas', true),
+      statTile(t('drives.unidades'), String(summary.total), null, 'configuradas', true),
       statTile(
         'Montadas',
         String(summary.mounted),
@@ -151,7 +151,7 @@
           h(
             'button.btn.btn--primary.btn--lg',
             { type: 'button', onclick: () => global.OM.driveForm.open() },
-            [icon('plus', 18, 'btn__icon'), h('span', 'Nueva unidad')]
+            [icon('plus', 18, 'btn__icon'), h('span', t('drives.nuevaUnidad'))]
           ),
         ]),
       ]),
@@ -213,7 +213,7 @@
             ),
             connection
               ? h('span.badge.badge--neutral', [icon('cloud', 12), serverName(connection)])
-              : h('span.badge.badge--error', 'Faltan las claves'),
+              : h('span.badge.badge--error', t('drives.faltanLasClaves')),
             mountCfg.readOnly
               ? h('span.badge.badge--neutral', [icon('lock', 12), 'Solo lectura'])
               : null,
@@ -231,9 +231,9 @@
 
       isMounted
         ? h('div.drive__live', [
-            h('div.live', [h('div.live__label', 'Velocidad'), speedNode]),
-            h('div.live', [h('div.live__label', 'Transferido'), movedNode]),
-            h('div.live', [h('div.live__label', 'Caché'), cacheNode]),
+            h('div.live', [h('div.live__label', t('drives.velocidad')), speedNode]),
+            h('div.live', [h('div.live__label', t('drives.transferido')), movedNode]),
+            h('div.live', [h('div.live__label', t('drives.cache')), cacheNode]),
           ])
         : null,
 
@@ -252,20 +252,20 @@
           {
             type: 'button',
             disabled: isBusy,
-            title: 'Desmontar la unidad',
+            title: t('drives.desmontarLaUnidad'),
             onclick: (e) => doUnmount(id, e.currentTarget),
           },
-          [icon('stop', 14, 'btn__icon'), h('span', 'Desmontar')]
+          [icon('stop', 14, 'btn__icon'), h('span', t('drives.desmontar'))]
         )
       : h(
           'button.btn.btn--primary.btn--sm',
           {
             type: 'button',
             disabled: isBusy,
-            title: 'Montar la unidad',
+            title: t('drives.montarLaUnidad'),
             onclick: (e) => doMount(id, e.currentTarget),
           },
-          [icon('play', 14, 'btn__icon'), h('span', 'Montar')]
+          [icon('play', 14, 'btn__icon'), h('span', t('drives.montar'))]
         );
 
     const iconBtn = (name, tip, handler, disabled) =>
@@ -384,7 +384,7 @@
         detail: pending
           ? `Hay ${pending} subida(s) pendientes. Se intentará completarlas antes de cerrar.`
           : 'Los programas que tengan ficheros abiertos en esa unidad perderán el acceso.',
-        confirmLabel: 'Desmontar',
+        confirmLabel: t('drives.desmontar'),
       });
       if (!confirmed) return;
     }
@@ -437,9 +437,9 @@
   async function remove(mountCfg) {
     const confirmed = await modal.confirm({
       title: `¿Eliminar "${mountCfg.name}"?`,
-      message: 'Se borra la configuración de esta unidad en OmniMount.',
+      message: t('drives.seBorraLaConfiguracion'),
       detail: t('drives.removeDetail'),
-      confirmLabel: 'Eliminar',
+      confirmLabel: t('drives.eliminar'),
       danger: true,
     });
     if (!confirmed) return;

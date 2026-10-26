@@ -22,10 +22,10 @@
   };
 
   const NAV = [
-    { route: 'dashboard', label: 'Unidades', icon: 'drive' },
-    { route: 'explorer', label: 'Explorador', icon: 'folder' },
-    { route: 'logs', label: 'Registro', icon: 'terminal' },
-    { route: 'settings', label: 'Ajustes', icon: 'settings' },
+    { route: 'dashboard', label: t('app.unidades'), icon: 'drive' },
+    { route: 'explorer', label: t('app.explorador'), icon: 'folder' },
+    { route: 'logs', label: t('app.registro'), icon: 'terminal' },
+    { route: 'settings', label: t('app.ajustes'), icon: 'settings' },
   ];
 
   /* ----------------------------------------------------------------- api */
@@ -191,11 +191,11 @@
 
     mount(foot, [
       h('div.sidebar__stat', [
-        h('span', 'Unidades activas'),
+        h('span', t('app.unidadesActivas')),
         h('strong', `${summary.mounted}/${summary.total}`),
       ]),
       h('div.sidebar__stat', [
-        h('span', 'Transferencia'),
+        h('span', t('app.transferencia')),
         h('strong', speed > 0 ? fmt.speed(speed) : '—'),
       ]),
       h('div.sidebar__version', `OmniMount ${state.appInfo.version || ''}`),
@@ -367,7 +367,7 @@
         mount(view, h('div.view__inner', [
           h('div.alert.alert--error', [
             h('div.alert__body', [
-              h('div.alert__title', 'OmniMount no pudo arrancar'),
+              h('div.alert__title', t('app.omnimountNoPudoArrancar')),
               h('span.selectable', err && err.message ? err.message : String(err)),
             ]),
           ]),

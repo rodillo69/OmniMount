@@ -8,8 +8,8 @@
   const fmt = global.OM.fmt;
 
   const STEPS = [
-    { id: 'rclone', label: 'Motor de transferencia' },
-    { id: 'winfsp', label: 'Controlador de unidad' },
+    { id: 'rclone', label: t('setup.motorDeTransferencia') },
+    { id: 'winfsp', label: t('setup.controladorDeUnidad') },
   ];
 
   let overlay = null;
@@ -28,8 +28,8 @@
     overlay = h('div.setup', [
       h('div.setup__panel', [
         h('div.setup__logo', global.OM.brand.lockup({ size: 26 })),
-        h('div.setup__kicker', 'Preparando OmniMount'),
-        h('h1.setup__title', 'Un momento, estamos dejándolo todo listo'),
+        h('div.setup__kicker', t('setup.preparandoOmnimount')),
+        h('h1.setup__title', t('setup.unMomentoEstamosDejandolo')),
         h(
           'p.setup__text',
           'Se están instalando los componentes que necesita la aplicación. Esto sólo ocurre la primera vez.'
@@ -60,7 +60,7 @@
             done ? icon('check', 14) : active ? h('span.setup__spinner') : h('span.setup__pending')
           ),
           h('div.setup__step-label', step.label),
-          done ? h('span.setup__step-state', 'Listo') : null,
+          done ? h('span.setup__step-state', t('setup.listo')) : null,
         ]);
       })
     );
@@ -156,7 +156,7 @@
     mount(actionsNode, [
       h('button.btn.btn--light.btn--lg', { type: 'button', onclick: onRetry }, [
         icon('refresh', 17, 'btn__icon'),
-        h('span', 'Reintentar'),
+        h('span', t('setup.reintentar')),
       ]),
     ]);
   }

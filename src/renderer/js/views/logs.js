@@ -13,9 +13,9 @@
   let entries = [];
 
   const FILTERS = [
-    { key: 'all', label: 'Todo' },
-    { key: 'problems', label: 'Avisos y errores' },
-    { key: 'system', label: 'Actividad' },
+    { key: 'all', label: t('logs.todo') },
+    { key: 'problems', label: t('logs.avisosYErrores') },
+    { key: 'system', label: t('logs.actividad') },
   ];
 
   function app() {
@@ -49,8 +49,8 @@
 
     return h('header.view__header', [
       h('div.view__heading', [
-        h('div.kicker', 'Diagnóstico'),
-        h('h1.view__title', 'Registro'),
+        h('div.kicker', t('logs.diagnostico')),
+        h('h1.view__title', t('logs.registro')),
         h(
           'p.view__sub',
           'La salida de rclone para cada unidad. Es el primer sitio donde mirar cuando un montaje falla.'
@@ -84,8 +84,8 @@
     return h('div.card', [
       h('div.empty', [
         h('div.empty__art', icon('terminal', 34)),
-        h('h2.empty__title', 'Nada registrado todavía'),
-        h('p.empty__text', 'Cuando crees y montes una unidad, su actividad aparecerá aquí.'),
+        h('h2.empty__title', t('logs.nadaRegistradoTodavia')),
+        h('p.empty__text', t('logs.cuandoCreesYMontes')),
       ]),
     ]);
   }
@@ -164,7 +164,7 @@
       mount(linesNode, [
         h('div.empty', { style: { padding: 'var(--sp-12) var(--sp-6)' } }, [
           h('div.empty__art', icon('terminal', 34)),
-          h('h2.empty__title', 'Sin líneas'),
+          h('h2.empty__title', t('logs.sinLineas')),
           h(
             'p.empty__text',
             view.filter === 'all'

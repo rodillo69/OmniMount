@@ -93,8 +93,8 @@
 
     return h('header.view__header', [
       h('div.view__heading', [
-        h('div.kicker', 'Contenido remoto'),
-        h('h1.view__title', 'Explorador'),
+        h('div.kicker', t('explorer.contenidoRemoto')),
+        h('h1.view__title', t('explorer.explorador')),
         h(
           'p.view__sub',
           'Navega por el almacenamiento sin montar la unidad. Las operaciones van directas al servidor remoto.'
@@ -128,13 +128,13 @@
     return h('div.card', [
       h('div.empty', [
         h('div.empty__art', icon('folder', 34)),
-        h('h2.empty__title', 'No hay nada que explorar'),
-        h('p.empty__text', 'Crea una unidad y podrás navegar por su contenido desde aquí.'),
+        h('h2.empty__title', t('explorer.noHayNadaQue')),
+        h('p.empty__text', t('explorer.creaUnaUnidadY')),
         h('div.empty__actions', [
           h(
             'button.btn.btn--primary.btn--lg',
             { type: 'button', onclick: () => app().navigate('wizard') },
-            [icon('plus', 18, 'btn__icon'), h('span', 'Nueva unidad')]
+            [icon('plus', 18, 'btn__icon'), h('span', t('explorer.nuevaUnidad'))]
           ),
         ]),
       ]),
@@ -196,25 +196,25 @@
         ? h(
             'button.btn.btn--outline.btn--sm',
             { type: 'button', onclick: (e) => download(e.currentTarget) },
-            [icon('download', 14, 'btn__icon'), h('span', 'Descargar')]
+            [icon('download', 14, 'btn__icon'), h('span', t('explorer.descargar'))]
           )
         : null,
       selectedCount
         ? h(
             'button.btn.btn--danger.btn--sm',
             { type: 'button', onclick: (e) => removeSelected(e.currentTarget) },
-            [icon('trash', 14, 'btn__icon'), h('span', 'Eliminar')]
+            [icon('trash', 14, 'btn__icon'), h('span', t('explorer.eliminar'))]
           )
         : null,
       h(
         'button.btn.btn--ghost.btn--icon.btn--sm.tooltip',
-        { type: 'button', 'data-tip': 'Nueva carpeta', onclick: createFolder },
+        { type: 'button', 'data-tip': t('explorer.nuevaCarpeta'), onclick: createFolder },
         icon('folderPlus', 15)
       ),
       h(
         'button.btn.btn--outline.btn--sm',
         { type: 'button', disabled: target.readOnly, onclick: (e) => upload(e.currentTarget) },
-        [icon('upload', 14, 'btn__icon'), h('span', 'Subir')]
+        [icon('upload', 14, 'btn__icon'), h('span', t('explorer.subir'))]
       ),
       h(
         'button.btn.btn--ghost.btn--icon.btn--sm.tooltip',
@@ -273,7 +273,7 @@
     const head = h('div.entry.entry--head', [
       h('input.entry__check', {
         type: 'checkbox',
-        title: 'Seleccionar todo',
+        title: t('explorer.seleccionarTodo'),
         checked: view.entries.length > 0 && view.selected.size === view.entries.length,
         onchange: (e) => {
           view.selected = e.target.checked ? new Set(view.entries.map((x) => x.key)) : new Set();
@@ -281,9 +281,9 @@
           paintList();
         },
       }),
-      h('div', 'Nombre'),
+      h('div', t('explorer.nombre')),
       h('div', { style: { textAlign: 'right' } }, 'Tamaño'),
-      h('div', 'Modificado'),
+      h('div', t('explorer.modificado')),
       h('div'),
     ]);
 
@@ -321,8 +321,8 @@
         head,
         h('div.empty', { style: { padding: 'var(--sp-12) var(--sp-6)' } }, [
           h('div.empty__art', icon('folder', 34)),
-          h('h2.empty__title', 'Carpeta vacía'),
-          h('p.empty__text', 'No hay objetos bajo este prefijo.'),
+          h('h2.empty__title', t('explorer.carpetaVacia')),
+          h('p.empty__text', t('explorer.noHayObjetosBajo')),
         ]),
       ]);
       return;
@@ -365,7 +365,7 @@
           'button.btn.btn--ghost.btn--icon.btn--sm',
           {
             type: 'button',
-            title: 'Renombrar',
+            title: t('explorer.renombrar'),
             onclick: (e) => {
               e.stopPropagation();
               rename(item);
@@ -383,7 +383,7 @@
       h(
         'button.btn.btn--outline.btn--sm',
         { type: 'button', onclick: (e) => withBusy(e.currentTarget, () => load(true)) },
-        [icon('chevronDown', 14, 'btn__icon'), h('span', 'Cargar más')]
+        [icon('chevronDown', 14, 'btn__icon'), h('span', t('explorer.cargarMas'))]
       ),
     ]);
   }
@@ -397,11 +397,11 @@
     mount(footNode, [
       h('span', statusText || `${folders} carpeta(s) · ${files} fichero(s) · ${fmt.bytes(bytes)}`),
       h('div.row', [
-        view.truncated ? h('span.badge.badge--neutral', 'Listado parcial') : null,
+        view.truncated ? h('span.badge.badge--neutral', t('explorer.listadoParcial')) : null,
         h(
           'button.btn.btn--ghost.btn--sm',
           { type: 'button', onclick: (e) => computeUsage(e.currentTarget) },
-          [icon('activity', 14, 'btn__icon'), h('span', 'Calcular tamaño total')]
+          [icon('activity', 14, 'btn__icon'), h('span', t('explorer.calcularTamanoTotal'))]
         ),
       ]),
     ]);
@@ -493,8 +493,8 @@
       message: folders.length
         ? `Entre ellos hay ${folders.length} carpeta(s); se borrará todo su contenido.`
         : 'Los ficheros se eliminarán del almacenamiento remoto.',
-      detail: 'Esta acción no se puede deshacer desde OmniMount.',
-      confirmLabel: 'Eliminar',
+      detail: t('explorer.estaAccionNoSe'),
+      confirmLabel: t('explorer.eliminar'),
       danger: true,
     });
     if (!confirmed) return;
@@ -522,10 +522,10 @@
     if (!target) return;
 
     const name = await modal.prompt({
-      title: 'Nueva carpeta',
-      label: 'Nombre',
+      title: t('explorer.nuevaCarpeta'),
+      label: t('explorer.nombre'),
       placeholder: 'documentos',
-      hint: 'En S3 una carpeta es un objeto vacío terminado en barra.',
+      hint: t('explorer.enS3UnaCarpeta'),
       validate: (value) => (/[\\/]/.test(value) ? 'No puede contener barras.' : null),
     });
     if (!name) return;
@@ -556,8 +556,8 @@
     }
 
     const name = await modal.prompt({
-      title: 'Renombrar',
-      label: 'Nuevo nombre',
+      title: t('explorer.renombrar'),
+      label: t('explorer.nuevoNombre'),
       value: item.name,
       validate: (value) => (/[\\/]/.test(value) ? 'No puede contener barras.' : null),
     });

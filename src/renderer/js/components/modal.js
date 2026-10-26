@@ -105,7 +105,7 @@
         ]),
         footer: h('div.row', [
           h('button.btn.btn--ghost', { type: 'button', onclick: () => finish(false) },
-            opts.cancelLabel || 'Cancelar'),
+            opts.cancelLabel || t('modal.cancelar')),
           h(
             `button.btn.${opts.danger ? 'btn--danger' : 'btn--primary'}`,
             { type: 'button', 'data-autofocus': '', onclick: () => finish(true) },
@@ -173,7 +173,7 @@
           error,
         ]),
         footer: h('div.row', [
-          h('button.btn.btn--ghost', { type: 'button', onclick: () => finish(null) }, 'Cancelar'),
+          h('button.btn.btn--ghost', { type: 'button', onclick: () => finish(null) }, t('modal.cancelar')),
           h('button.btn.btn--primary', { type: 'button', onclick: submit },
             opts.confirmLabel || 'Aceptar'),
         ]),
