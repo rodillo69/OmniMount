@@ -1,0 +1,187 @@
+/* ==========================================================================
+   OmniMount — design tokens
+
+   Typography uses the platform UI font. A desktop utility that looks native
+   is a feature, and it keeps the installer free of font files and of any
+   licensing question.
+
+   The palette is a neutral slate scale with a single teal accent. One accent
+   colour, used only where the user can act, keeps the interface readable and
+   leaves the semantic colours free to mean something.
+   ========================================================================== */
+
+:root {
+  /* ----------------------------------------------------------- neutrals */
+  --sl-50:  #f8fafc;
+  --sl-100: #f1f5f9;
+  --sl-200: #e2e8f0;
+  --sl-300: #cbd5e1;
+  --sl-400: #94a3b8;
+  --sl-500: #64748b;
+  --sl-600: #475569;
+  --sl-700: #334155;
+  --sl-800: #1e293b;
+  --sl-900: #0f172a;
+  --sl-950: #020617;
+
+  /* -------------------------------------------------------------- accent */
+  --tl-50:  #f0fdfa;
+  --tl-100: #ccfbf1;
+  --tl-200: #99f6e4;
+  --tl-300: #5eead4;
+  --tl-400: #2dd4bf;
+  --tl-500: #14b8a6;
+  --tl-600: #0d9488;
+  --tl-700: #0f766e;
+  --tl-800: #115e59;
+  --tl-900: #134e4a;
+
+  /* ------------------------------------------------------------ semantic
+     Reserved for state. Never used for decoration, so that a red in this
+     interface always means something went wrong. */
+  --fn-error: #dc2626;
+  --fn-error-bg: #fef2f2;
+  --fn-warn: #b45309;
+  --fn-warn-bg: #fffbeb;
+  --fn-ok: #15803d;
+  --fn-ok-bg: #f0fdf4;
+
+  /* ------------------------------------------------------------- spacing */
+  --sp-1: 4px;   --sp-2: 8px;   --sp-3: 12px;  --sp-4: 16px;
+  --sp-5: 20px;  --sp-6: 24px;  --sp-8: 32px;  --sp-10: 40px;
+  --sp-12: 48px; --sp-16: 64px; --sp-20: 80px; --sp-24: 96px;
+
+  /* ---------------------------------------------------------- typography */
+  --font: 'Segoe UI Variable Text', 'Segoe UI', -apple-system,
+          BlinkMacSystemFont, system-ui, 'Inter', 'Helvetica Neue', sans-serif;
+  --font-display: 'Segoe UI Variable Display', 'Segoe UI', -apple-system,
+          BlinkMacSystemFont, system-ui, 'Inter', sans-serif;
+  --font-mono: 'Cascadia Mono', 'Consolas', 'SF Mono', ui-monospace, monospace;
+
+  --fs-display: 30px;
+  --fs-h1: 23px;
+  --fs-h2: 18px;
+  --fs-h3: 15px;
+  --fs-body: 14px;
+  --fs-sm: 13px;
+  --fs-xs: 11.5px;
+
+  --lh-tight: 1.2;
+  --lh-snug: 1.38;
+  --lh-body: 1.55;
+
+  --track-kicker: 0.08em;
+
+  /* --------------------------------------------------------------- shape */
+  --r-sm: 5px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --r-pill: 999px;
+
+  /* ------------------------------------------------------------- motion */
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --t-fast: 120ms;
+  --t-base: 190ms;
+  --t-slow: 320ms;
+
+  --titlebar-h: 44px;
+  --sidebar-w: 240px;
+}
+
+/* =============================================================== light */
+:root,
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --bg: var(--sl-100);
+  --bg-elevated: #ffffff;
+  --surface: #ffffff;
+  --surface-2: var(--sl-50);
+  --surface-3: var(--sl-100);
+  --surface-inset: var(--sl-50);
+
+  --border: var(--sl-200);
+  --border-strong: var(--sl-300);
+  --border-subtle: #eef2f6;
+
+  --text: var(--sl-900);
+  --text-secondary: var(--sl-700);
+  --text-muted: var(--sl-500);
+  --text-faint: var(--sl-400);
+
+  --accent: var(--tl-600);
+  --accent-hover: var(--tl-700);
+  --accent-soft: var(--tl-50);
+  --accent-border: var(--tl-200);
+
+  --titlebar-bg: #ffffff;
+
+  /* The sidebar is a solid dark rail: it anchors the window without
+     competing with the content for attention. */
+  --rail-bg: var(--sl-900);
+  --rail-text: rgba(248, 250, 252, 0.68);
+  --rail-text-active: #ffffff;
+  --rail-hover: rgba(248, 250, 252, 0.08);
+  --rail-active: rgba(248, 250, 252, 0.13);
+  --rail-border: rgba(248, 250, 252, 0.1);
+
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 2px 6px rgba(15, 23, 42, 0.06), 0 8px 20px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 10px 20px rgba(15, 23, 42, 0.08), 0 28px 56px rgba(15, 23, 42, 0.1);
+  --shadow-focus: 0 0 0 3px rgba(13, 148, 136, 0.22);
+
+  --scrollbar-thumb: var(--sl-300);
+  --scrollbar-thumb-hover: var(--sl-400);
+}
+
+/* ================================================================ dark */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: var(--sl-950);
+  --bg-elevated: var(--sl-800);
+  --surface: #111c2e;
+  --surface-2: #16223a;
+  --surface-3: #1d2b45;
+  --surface-inset: #0c1626;
+
+  --border: #243348;
+  --border-strong: #32455f;
+  --border-subtle: #1a2638;
+
+  --text: var(--sl-100);
+  --text-secondary: var(--sl-300);
+  --text-muted: var(--sl-400);
+  --text-faint: var(--sl-500);
+
+  --accent: var(--tl-400);
+  --accent-hover: var(--tl-300);
+  --accent-soft: rgba(20, 184, 166, 0.14);
+  --accent-border: rgba(45, 212, 191, 0.34);
+
+  --titlebar-bg: #0b1422;
+
+  --rail-bg: #0b1422;
+  --rail-text: rgba(226, 232, 240, 0.64);
+  --rail-text-active: #ffffff;
+  --rail-hover: rgba(226, 232, 240, 0.07);
+  --rail-active: rgba(226, 232, 240, 0.12);
+  --rail-border: rgba(226, 232, 240, 0.09);
+
+  --fn-error: #f87171;
+  --fn-error-bg: rgba(220, 38, 38, 0.16);
+  --fn-warn: #fbbf24;
+  --fn-warn-bg: rgba(180, 83, 9, 0.18);
+  --fn-ok: #4ade80;
+  --fn-ok-bg: rgba(21, 128, 61, 0.18);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.42), 0 10px 26px rgba(0, 0, 0, 0.32);
+  --shadow-lg: 0 12px 26px rgba(0, 0, 0, 0.46), 0 32px 64px rgba(0, 0, 0, 0.42);
+  --shadow-focus: 0 0 0 3px rgba(45, 212, 191, 0.26);
+
+  --scrollbar-thumb: #2a3b53;
+  --scrollbar-thumb-hover: #3c5273;
+}
