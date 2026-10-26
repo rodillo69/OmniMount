@@ -1,4 +1,7 @@
 'use strict';
+
+// Sent when fetching rclone releases; GitHub rejects requests without one.
+const USER_AGENT = `OmniMount/${require('../../package.json').version}`;
 const fs = require('node:fs');
 const path = require('node:path');
 const https = require('node:https');
@@ -114,7 +117,7 @@ async function checkAll() {
 
 function download(url, destination, onProgress, redirectsLeft = 5) {
   return new Promise((resolve, reject) => {
-    const req = https.get(url, { headers: { 'User-Agent': 'AireDrive/1.0' }, timeout: 60000 },
+    const req = https.get(url, { headers: { 'User-Agent': USER_AGENT }, timeout: 60000 },
       (res) => {
         if ([301, 302, 303, 307, 308].includes(res.statusCode)) {
           res.resume();
@@ -237,7 +240,7 @@ async function resolveWinFspRelease() {
     const body = await new Promise((resolve, reject) => {
       const req = https.get(
         'https://api.github.com/repos/winfsp/winfsp/releases/latest',
-        { headers: { 'User-Agent': 'AireDrive/1.0', Accept: 'application/vnd.github+json' }, timeout: 15000 },
+        { headers: { 'User-Agent': USER_AGENT, Accept: 'application/vnd.github+json' }, timeout: 15000 },
         (res) => {
           const chunks = [];
           res.on('data', (c) => chunks.push(c));

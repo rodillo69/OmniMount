@@ -17,20 +17,17 @@
     const opts = options || {};
     const editing = opts.editId ? app().state.mounts.find((m) => m.id === opts.editId) : null;
 
-    const info = await app().call(app().api.setup.regions(), { silent: true });
-    const regions = (info && info.regions) || [];
+    const info = await app().call(app().api.setup.credentials(), { silent: true });
+    const storedKeys = (info && info.saved) || [];
 
-    // Al editar, la región es la de su conexión y no se cambia: cambiarla
-    // supondría otras credenciales y otro bucket, es decir, otra unidad.
+    // When editing, the server is fixed: pointing the same drive at another
+    // endpoint would mean other credentials and another bucket, which is a
+    // different drive altogether.
     const editedConn = editing ? app().connectionOf(editing.connectionId) : null;
-    const initialRegion =
-      (editedConn && editedConn.regionId) ||
-      (info && info.defaultRegionId) ||
-      (regions[0] && regions[0].id);
 
     const data = {
       id: editing ? editing.id : undefined,
-      regionId: initialRegion,
+      endpoint: editedConn ? editedConn.endpoint : (storedKeys[0] ? storedKeys[0].endpoint : ''),
       bucket: editing ? editing.bucket : '',
       driveLetter: editing ? editing.driveLetter : '',
       name: editing ? editing.name : '',
@@ -43,16 +40,14 @@
       newCredentials: false,
     };
 
-    /** Claves guardadas de la región elegida. Las de otra región no sirven. */
-    function regionNow() {
-      return regions.find((r) => r.id === data.regionId) || regions[0] || null;
-    }
+    /** Credentials already stored for the endpoint being typed. */
     function savedKeys() {
-      const r = regionNow();
-      return r ? r.credentials : [];
+      const target = (data.endpoint || '').trim().replace(/\/+$/, '').toLowerCase();
+      if (!target) return [];
+      return storedKeys.filter((c) => (c.endpoint || '').toLowerCase() === target);
     }
 
-    /** Ajusta credenciales y conexión al cambiar de región. */
+    /** Offer stored credentials when the endpoint changes, ask when there are none. */
     function syncCredentials() {
       const keys = savedKeys();
       if (keys.length) {
@@ -79,36 +74,44 @@
     function paint() {
       const letterOptions = [...new Set([data.driveLetter, ...letters].filter(Boolean))].sort();
       const keys = savedKeys();
-      const saved = keys[0];
+      const currentKey = keys[0];
 
       mount(body, [
         errorSlot,
 
-        // La región va primero: determina qué claves valen y en qué sitio se
-        // busca el bucket. Un bucket de Equinix no existe en Albasanz.
+        // The endpoint comes first: it decides which stored credentials
+        // apply and where the bucket is looked up.
         field(
-          'Región',
-          h(
-            'select.select',
-            {
-              disabled: Boolean(editing),
-              onchange: (e) => {
-                data.regionId = e.target.value;
-                syncCredentials();
-                paint();
-              },
+          'Endpoint',
+          h('input.input.input--mono', {
+            type: 'text',
+            value: data.endpoint,
+            placeholder: 'https://s3.example.com',
+            disabled: Boolean(editing),
+            spellcheck: 'false',
+            list: storedKeys.length ? 'known-endpoints' : null,
+            oninput: (e) => {
+              data.endpoint = e.target.value.trim();
             },
-            regions.map((r) =>
-              h('option', { value: r.id, selected: r.id === data.regionId }, `${r.name} — ${r.location}`)
-            )
-          ),
+            onchange: () => {
+              syncCredentials();
+              paint();
+            },
+          }),
           {
             required: true,
             hint: editing
-              ? 'No se puede cambiar: cada región tiene sus propios buckets y claves.'
-              : 'Cada región es independiente, con sus propios buckets y credenciales.',
+              ? 'Fixed for an existing drive: another server means another drive.'
+              : 'Address of the storage service. Any S3-compatible endpoint works.',
           }
         ),
+
+        storedKeys.length
+          ? h(
+              'datalist#known-endpoints',
+              [...new Set(storedKeys.map((c) => c.endpoint))].map((e) => h('option', { value: e }))
+            )
+          : null,
 
         field(
           'Nombre del bucket',
@@ -125,7 +128,7 @@
           { required: true, hint: 'Tal y como se llama en el almacenamiento remoto.' }
         ),
 
-        data.newCredentials ? credentialFields(data) : savedCredentials(saved),
+        data.newCredentials ? credentialFields(data) : savedCredentials(currentKey),
 
         field(
           'Letra de la unidad',
@@ -203,7 +206,7 @@
         ]),
         h('div.field__hint', [
           icon('lock', 12, 'inline-icon'),
-          ` Las de ${regionNow() ? regionNow().name : 'esta región'}. Se guardan cifradas con Windows y sólo tu usuario puede leerlas.`,
+          ' Stored encrypted by the operating system; only your account can read them.',
         ]),
         savedKeys().length
           ? h(
@@ -227,7 +230,7 @@
         h('div.saved-creds__text', [
           h(
             'div.saved-creds__title',
-            `Se usarán tus claves de ${regionNow() ? regionNow().name : 'esta región'}`
+            'Using your saved credentials'
           ),
           h('div.saved-creds__sub', saved ? saved.accessKeyId : ''),
         ]),
@@ -318,11 +321,10 @@
     async function submit(button) {
       mount(errorSlot, []);
 
-      const region = regionNow();
-      if (!region) return showError('Elige una región.');
-      if (!data.bucket) return showError('Escribe el nombre del bucket.');
+      if (!data.endpoint) return showError('Enter the endpoint of the service.');
+      if (!data.bucket) return showError('Enter the bucket name.');
       if (data.newCredentials && (!data.accessKeyId || !data.secretAccessKey)) {
-        return showError(`Hacen falta la Access Key y la Secret Key de ${region.name}.`);
+        return showError('Both the access key and the secret key are required.');
       }
       if (!data.driveLetter) {
         return showError('No hay ninguna letra de unidad libre en este equipo.');
@@ -331,7 +333,7 @@
       await withBusy(button, async () => {
         const payload = {
           id: data.id,
-          regionId: data.regionId,
+          endpoint: data.endpoint,
           bucket: data.bucket,
           driveLetter: data.driveLetter,
           name: data.name,

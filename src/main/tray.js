@@ -5,7 +5,7 @@ const store = require('./store');
 const mounts = require('./mount-manager');
 const log = require('./logger').scoped('tray');
 
-const ICON = path.join(__dirname, '..', 'renderer', 'assets', 'img', 'favicon.png');
+const ICON = path.join(__dirname, '..', 'renderer', 'assets', 'icon.png');
 
 let tray = null;
 let onShow = null;

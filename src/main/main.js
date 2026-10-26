@@ -23,35 +23,32 @@ const ipc = require('./ipc');
 const mounts = require('./mount-manager');
 const tray = require('./tray');
 
-const THEME_BARS = {
-  dark: { color: '#0a0f3d', symbolColor: '#f6f4f1' },
-  light: { color: '#ffffff', symbolColor: '#000a5a' },
-};
+/**
+ * Painted before the page loads, so the window never flashes white on a dark
+ * desktop. Must track --bg in tokens.css.
+ */
+const WINDOW_BG = { dark: '#020617', light: '#f1f5f9' };
 
 let mainWindow = null;
 let quitting = false;
 const startedHidden = process.argv.includes('--minimized');
 
-function barColours() {
-  return nativeTheme.shouldUseDarkColors ? THEME_BARS.dark : THEME_BARS.light;
-}
-
 function createWindow() {
-  const bar = barColours();
-
   mainWindow = new BrowserWindow({
     width: 1240,
     height: 820,
     minWidth: 940,
     minHeight: 640,
     show: false,
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#070b2e' : '#f6f4f1',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? WINDOW_BG.dark : WINDOW_BG.light,
     title: 'OmniMount',
     icon: path.join(__dirname, '..', '..', 'build', 'icon.png'),
     // The app paints its own header inside the title bar strip, so the window
     // controls are native but the chrome is ours.
+    // No titleBarOverlay: the native buttons are drawn by Windows over our
+    // own title bar and never match its colours or height. The renderer
+    // draws them instead, wired through the window:* IPC channels.
     titleBarStyle: 'hidden',
-    titleBarOverlay: { ...bar, height: 48 },
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'preload.js'),
       contextIsolation: true,
@@ -160,12 +157,6 @@ app.whenReady().then(async () => {
       quitApp();
     },
     onNavigate: navigate,
-  });
-
-  nativeTheme.on('updated', () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.setTitleBarOverlay({ ...barColours(), height: 48 });
-    }
   });
 
   // Mantiene el elemento de inicio al día por si se cambió desde la

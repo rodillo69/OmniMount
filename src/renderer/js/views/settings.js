@@ -119,7 +119,7 @@
                 h('div', [
                   h('div.row', { style: { gap: 'var(--sp-2)', alignItems: 'center' } }, [
                     h('span.setting__label.mono', conn.accessKeyId),
-                    h('span.badge.badge--neutral', regionName(conn)),
+                    h('span.badge.badge--neutral', serverName(conn)),
                   ]),
                   h(
                     'div.setting__hint',
@@ -198,13 +198,9 @@
     toast.ok('Claves eliminadas.');
   }
 
-  /** Nombre legible de la región de una conexión guardada. */
-  function regionName(conn) {
-    const regions = app().state.appInfo.regions || [];
-    const match =
-      regions.find((r) => r.id === conn.regionId) ||
-      regions.find((r) => r.endpoint === conn.endpoint);
-    return match ? match.name : 'desconocida';
+  /** Host a stored credential belongs to. */
+  function serverName(conn) {
+    return String(conn.endpoint || '').replace(/^https?:[/][/]/, '') || '—';
   }
 
   /* ------------------------------------------------------- componentes */

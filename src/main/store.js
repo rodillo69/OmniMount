@@ -187,9 +187,6 @@ async function saveConnection(input) {
   const record = {
     id: existing ? existing.id : `conn_${crypto.randomUUID()}`,
     name: (input.name || '').trim() || 'Conexion sin nombre',
-    // Las credenciales pertenecen a una región concreta y no valen en la otra,
-    // así que la región forma parte de la identidad de la conexión.
-    regionId: input.regionId || (existing ? existing.regionId : null),
     endpoint: normaliseEndpoint(input.endpoint),
     region: (input.region || 'us-east-1').trim(),
     accessKeyId: (input.accessKeyId || '').trim(),

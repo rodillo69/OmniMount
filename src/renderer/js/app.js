@@ -203,6 +203,8 @@
   }
 
   function renderTitlebarStatus() {
+    paintWindowControls();
+
     const node = document.getElementById('titlebar-status');
     if (!node) return;
     const summary = counts();
@@ -390,4 +392,84 @@
     boot,
     runSetup,
   };
+  /* ------------------------------------------------------- window buttons */
+
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  let isMaximized = false;
+
+  /**
+   * Glyph for a window button.
+   *
+   * Built here rather than through OM.dom.svg because these need the shell's
+   * look: a 1px square-ended stroke on a 10x10 grid. The shared helper draws
+   * 1.7px rounded strokes, which reads as hand-drawn next to the system
+   * chrome. Inline SVG also avoids depending on the Segoe icon font, which is
+   * missing on some builds and would render as a hollow box.
+   */
+  function glyph(paths) {
+    const node = document.createElementNS(SVG_NS, 'svg');
+    node.setAttribute('viewBox', '0 0 10 10');
+    node.setAttribute('width', '10');
+    node.setAttribute('height', '10');
+    node.setAttribute('fill', 'none');
+    node.setAttribute('stroke', 'currentColor');
+    node.setAttribute('stroke-width', '1');
+    node.setAttribute('aria-hidden', 'true');
+    for (const d of [].concat(paths)) {
+      const path = document.createElementNS(SVG_NS, 'path');
+      path.setAttribute('d', d);
+      node.appendChild(path);
+    }
+    return node;
+  }
+
+  /** Minimise, maximise and close: 46x32, the same metrics as the shell. */
+  function paintWindowControls() {
+    const host = document.getElementById('titlebar-controls');
+    if (!host) return;
+
+    const button = (name, label, paths, onclick) => {
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'wincontrol wincontrol--' + name;
+      el.title = label;
+      el.setAttribute('aria-label', label);
+      el.addEventListener('click', onclick);
+      el.appendChild(glyph(paths));
+      return el;
+    };
+
+    OM.dom.clear(host);
+
+    host.appendChild(
+      button('min', 'Minimizar', 'M0.5 5.5 H9.5', () => window.omni.window.minimize())
+    );
+
+    host.appendChild(
+      button(
+        'max',
+        isMaximized ? 'Restaurar' : 'Maximizar',
+        isMaximized
+          ? ['M0.5 3.5 H6.5 V9.5 H0.5 Z', 'M3 3.5 V1 H9 V7 H6.5']
+          : 'M0.5 0.5 H9.5 V9.5 H0.5 Z',
+        async () => {
+          const result = await window.omni.window.toggleMaximize();
+          if (result && result.ok && result.data) setMaximized(result.data.maximized);
+        }
+      )
+    );
+
+    host.appendChild(
+      button('close', 'Cerrar', ['M0.5 0.5 L9.5 9.5', 'M9.5 0.5 L0.5 9.5'], () =>
+        window.omni.window.close()
+      )
+    );
+  }
+
+  function setMaximized(value) {
+    if (isMaximized === value) return;
+    isMaximized = value;
+    paintWindowControls();
+  }
+
 })(window);

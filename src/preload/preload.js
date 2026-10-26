@@ -46,9 +46,17 @@ contextBridge.exposeInMainWorld('omni', {
     suggest: (preferred) => invoke('drives:suggest', preferred),
   },
 
+  window: {
+    minimize: () => invoke('window:minimize'),
+    toggleMaximize: () => invoke('window:toggle-maximize'),
+    close: () => invoke('window:close'),
+    state: () => invoke('window:state'),
+    onState: (cb) => subscribe('window:state', cb),
+  },
+
   setup: {
     createDrive: (input) => invoke('setup:createDrive', input),
-    regions: () => invoke('setup:regions'),
+    credentials: () => invoke('setup:credentials'),
   },
 
   mounts: {

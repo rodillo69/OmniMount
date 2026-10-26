@@ -17,12 +17,28 @@ let window = null;
 
 function setWindow(win) {
   window = win;
+  if (win) watchWindowState(win);
 }
 
 function send(channel, payload) {
   if (window && !window.isDestroyed()) {
     window.webContents.send(channel, payload);
   }
+}
+
+/** The live window, or null once it has gone. */
+function getWindow() {
+  return window && !window.isDestroyed() ? window : null;
+}
+
+/**
+ * Keep the renderer's maximise button in step with the real window state,
+ * which also changes by double-clicking the bar or by Win+Up.
+ */
+function watchWindowState(win) {
+  const report = () => send('window:state', { maximized: win.isMaximized() });
+  win.on('maximize', report);
+  win.on('unmaximize', report);
 }
 
 /**
@@ -85,7 +101,6 @@ function register() {
     userData: dirs.userData,
     logPath: logger.logFile,
     cacheDir: dirs.cache,
-    regions: defaults.REGIONS.map((r) => ({ id: r.id, name: r.name, location: r.location, endpoint: r.endpoint })),
     encryptionAvailable: await store.encryptionAvailable(),
     rcloneVersion: await rclone.version(),
   }));
@@ -179,8 +194,8 @@ function register() {
     const bucket = String(data.bucket || '').trim().replace(/^\/+|\/+$/g, '');
     if (!bucket) throw new Error('Escribe el nombre del bucket.');
 
-    const region = defaults.resolveRegion(data.regionId);
-    const endpoint = region.endpoint;
+    const endpoint = store.normaliseEndpoint(data.endpoint);
+    if (!endpoint) throw new Error('An endpoint is required.');
 
     // Credenciales: las nuevas que llegan, o las de una conexión ya guardada.
     let connectionId = data.connectionId || null;
@@ -189,7 +204,7 @@ function register() {
     if (data.accessKeyId && data.secretAccessKey) {
       probe = {
         endpoint,
-        region: defaults.S3.signingRegion,
+        region: data.signingRegion || defaults.S3.signingRegion,
         accessKeyId: String(data.accessKeyId).trim(),
         secretAccessKey: String(data.secretAccessKey),
         forcePathStyle: defaults.S3.forcePathStyle,
@@ -200,17 +215,16 @@ function register() {
       if (!probe || !probe.secretAccessKey) {
         throw new Error('No se pudieron recuperar las claves guardadas. Introdúcelas de nuevo.');
       }
-      // Las claves de una región no valen en la otra: el endpoint devolvería
-      // InvalidAccessKeyId. Se detecta aquí, con un mensaje que se entienda.
+      // Credentials belong to the server they were issued for. Reusing them
+      // elsewhere fails with an opaque error from the service, so it is
+      // caught here with something the user can act on.
       if (probe.endpoint !== endpoint) {
-        const suya = defaults.regionByEndpoint(probe.endpoint);
         throw new Error(
-          `Esas claves son de ${suya ? suya.name : 'otra región'} y no sirven en ${region.name}. ` +
-            `Cada región tiene sus propias credenciales.`
+          `Those credentials belong to ${probe.endpoint}, not to ${endpoint}.`
         );
       }
     } else {
-      throw new Error(`Faltan las claves de acceso de ${region.name}.`);
+      throw new Error('Access credentials are required.');
     }
 
     // Se comprueba contra el bucket real antes de guardar nada: así el error
@@ -223,19 +237,18 @@ function register() {
     }
 
     if (data.accessKeyId && data.secretAccessKey) {
-      // ¿Ya existe una conexión con esa misma clave en esta región? Se
-      // reutiliza en vez de acumular duplicados. La comparación incluye el
-      // endpoint porque la misma Access Key podría existir en ambas regiones.
+      // Reuse an existing connection with the same key on the same server
+      // rather than accumulating duplicates. The endpoint is part of the
+      // comparison because the same key id may exist on several servers.
       const existing = store
         .listConnections()
         .find((c) => c.accessKeyId === probe.accessKeyId && c.endpoint === endpoint);
 
       const saved = await store.saveConnection({
         id: existing ? existing.id : undefined,
-        name: existing ? existing.name : `almacenamiento remoto · ${region.name}`,
-        regionId: region.id,
+        name: existing ? existing.name : endpoint.replace(/^https?:[/][/]/, ''),
         endpoint,
-        region: defaults.S3.signingRegion,
+        region: data.signingRegion || defaults.S3.signingRegion,
         accessKeyId: probe.accessKeyId,
         secretAccessKey: probe.secretAccessKey,
         forcePathStyle: defaults.S3.forcePathStyle,
@@ -278,25 +291,39 @@ function register() {
    * Regiones disponibles y qué claves hay guardadas en cada una. El alta usa
    * esto para pedir credenciales sólo cuando la región elegida no las tiene.
    */
-  handle('setup:regions', () => {
-    const conns = store.listConnections().filter((c) => c.hasSecret);
+  /* ------------------------------------------------------- window frame */
 
-    return {
-      defaultRegionId: defaults.DEFAULT_REGION_ID,
-      regions: defaults.REGIONS.map((region) => {
-        const propias = conns.filter(
-          (c) => (c.regionId || (defaults.regionByEndpoint(c.endpoint) || {}).id) === region.id
-        );
-        return {
-          id: region.id,
-          name: region.name,
-          location: region.location,
-          endpoint: region.endpoint,
-          credentials: propias.map((c) => ({ id: c.id, accessKeyId: c.accessKeyId })),
-        };
-      }),
-    };
+  // The title bar is ours, so minimise/maximise/close arrive over IPC.
+  handle('window:minimize', () => {
+    const w = getWindow();
+    if (w) w.minimize();
   });
+
+  handle('window:toggle-maximize', () => {
+    const w = getWindow();
+    if (!w) return { maximized: false };
+    if (w.isMaximized()) w.unmaximize();
+    else w.maximize();
+    return { maximized: w.isMaximized() };
+  });
+
+  handle('window:close', () => {
+    const w = getWindow();
+    if (w) w.close();
+  });
+
+  handle('window:state', () => {
+    const w = getWindow();
+    return { maximized: Boolean(w && w.isMaximized()) };
+  });
+
+  /** Saved credentials, so the form can offer them instead of asking again. */
+  handle('setup:credentials', () => ({
+    saved: store
+      .listConnections()
+      .filter((c) => c.hasSecret)
+      .map((c) => ({ id: c.id, endpoint: c.endpoint, accessKeyId: c.accessKeyId })),
+  }));
 
   /* ----------------------------------------------------------- unidades */
 

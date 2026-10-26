@@ -212,7 +212,7 @@
               [h('span', STATE_TEXT[status.state] || status.state)]
             ),
             connection
-              ? h('span.badge.badge--neutral', [icon('cloud', 12), regionName(connection)])
+              ? h('span.badge.badge--neutral', [icon('cloud', 12), serverName(connection)])
               : h('span.badge.badge--error', 'Faltan las claves'),
             mountCfg.readOnly
               ? h('span.badge.badge--neutral', [icon('lock', 12), 'Solo lectura'])
@@ -318,13 +318,9 @@
     ]);
   }
 
-  /** Nombre legible de la región a la que pertenece una conexión. */
-  function regionName(connection) {
-    const regions = app().state.appInfo.regions || [];
-    const match =
-      regions.find((r) => r.id === connection.regionId) ||
-      regions.find((r) => r.endpoint === connection.endpoint);
-    return match ? match.name : 'Región desconocida';
+  /** Host of the server a connection points at, shown on the drive card. */
+  function serverName(connection) {
+    return String(connection.endpoint || '').replace(/^https?:[/][/]/, '') || 'unknown server';
   }
 
   function dotClass(state) {

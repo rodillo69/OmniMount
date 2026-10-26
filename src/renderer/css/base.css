@@ -190,6 +190,54 @@ code, kbd, pre, .mono {
   color: rgba(248, 250, 252, 0.55);
 }
 
+/* ------------------------------------------------- window buttons */
+
+/* Ours, not the system's: a native overlay cannot match the bar's colour or
+   height. Metrics follow the Windows shell so they still feel native. */
+.wincontrols {
+  -webkit-app-region: no-drag;
+  display: flex;
+  align-self: stretch;
+  /* Cancels the bar's horizontal padding: the close button must reach the
+     very corner, which is where people throw the pointer. */
+  margin-right: calc(var(--sp-4) * -1);
+}
+
+.wincontrol {
+  width: 46px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: default;
+  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+
+.wincontrol:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.wincontrol:active {
+  background: var(--surface-2);
+}
+
+.wincontrol--close:hover {
+  background: #c42b1c;
+  color: #fff;
+}
+
+.wincontrol--close:active {
+  background: #b22a1c;
+  color: #fff;
+}
+
+/* The focus ring would otherwise be clipped by the bar's edge. */
+.wincontrol:focus-visible {
+  outline-offset: -3px;
+}
+
 .titlebar__sep {
   width: 1px;
   height: 18px;
@@ -214,8 +262,8 @@ code, kbd, pre, .mono {
   gap: var(--sp-2);
   font-size: var(--fs-xs);
   color: var(--text-muted);
-  /* Hueco para los botones nativos de la ventana (titleBarOverlay). */
-  margin-right: 148px;
+  /* The window buttons sit next to this, so no gap has to be reserved. */
+  margin-right: var(--sp-3);
   padding: var(--sp-1) var(--sp-3);
   border-radius: var(--r-pill);
   background: var(--surface-2);

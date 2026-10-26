@@ -46,7 +46,7 @@ function scoped(scope) {
     info: (...a) => write('INFO', scope, ...a),
     warn: (...a) => write('WARN', scope, ...a),
     error: (...a) => write('ERROR', scope, ...a),
-    debug: (...a) => { if (process.env.AIRE_DEBUG) write('DEBUG', scope, ...a); },
+    debug: (...a) => { if (process.env.OMNIMOUNT_DEBUG) write('DEBUG', scope, ...a); },
   };
 }
 
