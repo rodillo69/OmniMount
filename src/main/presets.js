@@ -40,9 +40,14 @@ const PRESETS = [
     },
     regions: [
       {
-        id: 'mad-eqx',
-        label: 'Madrid · Equinix',
+        id: 'eqx',
+        label: 'Equinix',
         endpoint: 'https://s3-eqx.airetech.es',
+      },
+      {
+        id: 'abz',
+        label: 'Albasanz',
+        endpoint: 'https://s3-abz.airetech.es',
       },
     ],
   },
