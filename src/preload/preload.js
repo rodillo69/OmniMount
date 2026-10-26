@@ -54,6 +54,11 @@ contextBridge.exposeInMainWorld('omni', {
     onState: (cb) => subscribe('window:state', cb),
   },
 
+  backends: {
+    list: () => invoke('backends:list'),
+    get: (name) => invoke('backends:get', name),
+  },
+
   setup: {
     createDrive: (input) => invoke('setup:createDrive', input),
     credentials: () => invoke('setup:credentials'),

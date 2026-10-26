@@ -12,6 +12,8 @@ const DEFAULTS = {
   version: CONFIG_VERSION,
   settings: {
     theme: 'system',
+    // Empty follows the operating system; 'es' or 'en' pin it.
+    language: '',
     // La unidad tiene que sobrevivir a un reinicio: para eso la aplicación
     // arranca con Windows, en segundo plano, y monta lo marcado como
     // automático.
@@ -274,6 +276,24 @@ async function saveConnection(input) {
 
   save();
   return publicConnection(record);
+}
+
+/**
+ * Remove a connection, unless drives still depend on it.
+ *
+ * Deleting one in use would leave those drives unable to mount with an error
+ * pointing at a connection that no longer exists, so the names are listed
+ * instead and the caller decides.
+ */
+function deleteConnection(id) {
+  const data = get();
+  const inUse = data.mounts.filter((m) => m.connectionId === id);
+  if (inUse.length) {
+    const names = inUse.map((m) => m.name).join(', ');
+    throw new Error(`${inUse.length} drive(s) still use this connection: ${names}.`);
+  }
+  data.connections = data.connections.filter((c) => c.id !== id);
+  save();
 }
 
 function normaliseEndpoint(value) {

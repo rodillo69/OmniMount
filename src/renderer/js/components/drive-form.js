@@ -1,380 +1,365 @@
-/* OmniMount - alta y edición de una unidad.
-   Lo normal es rellenar bucket y claves; todo lo demás tiene un valor por
-   defecto que funciona y vive detrás de "Más opciones". */
-(function (global) {
-  'use strict';
+'use strict';
 
-  const { h, mount, field, switchRow, withBusy } = global.OM.dom;
-  const { icon } = global.OM.icons;
-  const toast = global.OM.toast;
-  const modal = global.OM.modal;
+/**
+ * The new-drive dialog.
+ *
+ * Two steps, because the fields cannot exist before the storage type is
+ * known: pick what you are connecting to, then fill in what that type needs.
+ * The second step is generated from rclone's own description of the backend,
+ * so this file contains no field names for any particular protocol.
+ */
+
+window.OM = window.OM || {};
+
+OM.driveForm = (() => {
+  const { h, field, clear } = OM.dom;
+  const fields = OM.backendFields;
 
   function app() {
-    return global.OM.app;
+    return window.OM.app;
   }
 
   async function open(options) {
     const opts = options || {};
     const editing = opts.editId ? app().state.mounts.find((m) => m.id === opts.editId) : null;
 
-    const info = await app().call(app().api.setup.credentials(), { silent: true });
-    const storedKeys = (info && info.saved) || [];
+    const catalogue = await app().call(app().api.backends.list(), { silent: true });
+    const types = (catalogue && catalogue.types) || [];
+    if (!types.length) {
+      return OM.toast.error(t('form.noTypes'));
+    }
 
-    // When editing, the server is fixed: pointing the same drive at another
-    // endpoint would mean other credentials and another bucket, which is a
-    // different drive altogether.
+    const stored = await app().call(app().api.setup.credentials(), { silent: true });
+    const saved = (stored && stored.saved) || [];
+
     const editedConn = editing ? app().connectionOf(editing.connectionId) : null;
 
-    const data = {
-      id: editing ? editing.id : undefined,
-      endpoint: editedConn ? editedConn.endpoint : (storedKeys[0] ? storedKeys[0].endpoint : ''),
-      bucket: editing ? editing.bucket : '',
-      driveLetter: editing ? editing.driveLetter : '',
-      name: editing ? editing.name : '',
+    const state = {
+      // Editing never changes the type: a different protocol is a different
+      // drive, not an edit of this one.
+      type: editedConn ? editedConn.type : null,
+      values: {},
+      root: editing ? editing.root || editing.bucket || '' : '',
       prefix: editing ? editing.prefix : '',
+      name: editing ? editing.name : '',
+      driveLetter: editing ? editing.driveLetter : '',
       readOnly: editing ? editing.readOnly : false,
       autoMount: editing ? editing.autoMount : true,
       connectionId: editing ? editing.connectionId : null,
-      accessKeyId: '',
-      secretAccessKey: '',
-      newCredentials: false,
+      reuseConnection: false,
+      showAdvanced: false,
+      search: '',
+      letters: [],
+      busy: false,
+      error: null,
     };
 
-    /** Credentials already stored for the endpoint being typed. */
-    function savedKeys() {
-      const target = (data.endpoint || '').trim().replace(/\/+$/, '').toLowerCase();
-      if (!target) return [];
-      return storedKeys.filter((c) => (c.endpoint || '').toLowerCase() === target);
+    if (editedConn) {
+      state.values = { ...(editedConn.config || {}) };
+      state.reuseConnection = true;
     }
 
-    /** Offer stored credentials when the endpoint changes, ask when there are none. */
-    function syncCredentials() {
-      const keys = savedKeys();
-      if (keys.length) {
-        if (!keys.some((k) => k.id === data.connectionId)) data.connectionId = keys[0].id;
-        data.newCredentials = false;
-      } else {
-        data.connectionId = null;
-        data.newCredentials = true;
-      }
+    const body = h('div.driveform');
+    const footer = h('div.modal__actions');
+
+    const modal = OM.modal.open({
+      title: editing ? t('form.editTitle') : t('form.newTitle'),
+      description: editing ? t('form.editDesc') : t('form.newDesc'),
+      body,
+      footer,
+      wide: true,
+      dismissable: !state.busy,
+    });
+
+    const freeLetters = await app().call(app().api.drives.free(), { silent: true });
+    state.letters = (freeLetters || []).slice();
+    if (!state.driveLetter) state.driveLetter = state.letters[0] || '';
+
+    function backend() {
+      return types.find((item) => item.name === state.type) || null;
     }
-    if (!editing) syncCredentials();
 
-    const letters = (await app().call(app().api.drives.free(), { silent: true })) || [];
-    if (!data.driveLetter) {
-      data.driveLetter =
-        (await app().call(app().api.drives.suggest(['S', 'T', 'U', 'V', 'W', 'Y', 'Z']), {
-          silent: true,
-        })) || letters[letters.length - 1] || '';
+    function setValue(name, value) {
+      state.values[name] = value;
     }
 
-    const errorSlot = h('div');
-    const body = h('div.stack.stack--lg');
+    /* ------------------------------------------------------- step one */
 
-    function paint() {
-      const letterOptions = [...new Set([data.driveLetter, ...letters].filter(Boolean))].sort();
-      const keys = savedKeys();
-      const currentKey = keys[0];
+    /**
+     * A backend's display name.
+     *
+     * The common ones have a translated name; the rest keep the vendor name
+     * rclone reports, which is a proper noun and the same in any language.
+     */
+    function labelOf(item) {
+      const key = `backend.${item.name}`;
+      const translated = t(key);
+      return translated === key ? item.label : translated;
+    }
 
-      mount(body, [
-        errorSlot,
+    /** Match a backend against the search box, by label, id or description. */
+    function matchesQuery(item, query) {
+      if (!query) return true;
+      return (
+        labelOf(item).toLowerCase().includes(query) ||
+        item.name.toLowerCase().includes(query) ||
+        item.description.toLowerCase().includes(query)
+      );
+    }
 
-        // The endpoint comes first: it decides which stored credentials
-        // apply and where the bucket is looked up.
-        field(
-          'Endpoint',
-          h('input.input.input--mono', {
-            type: 'text',
-            value: data.endpoint,
-            placeholder: 'https://s3.example.com',
-            disabled: Boolean(editing),
-            spellcheck: 'false',
-            list: storedKeys.length ? 'known-endpoints' : null,
-            oninput: (e) => {
-              data.endpoint = e.target.value.trim();
-            },
-            onchange: () => {
-              syncCredentials();
+    function typePicker() {
+      const query = state.search.trim().toLowerCase();
+
+      const matches = types.filter((item) => matchesQuery(item, query));
+
+      const card = (item) =>
+        h(
+          'button.backend-card',
+          {
+            type: 'button',
+            title: item.description,
+            onclick: () => {
+              state.type = item.name;
+              state.values = fields.initial(item);
+              state.error = null;
               paint();
             },
-          }),
-          {
-            required: true,
-            hint: editing
-              ? 'Fixed for an existing drive: another server means another drive.'
-              : 'Address of the storage service. Any S3-compatible endpoint works.',
-          }
-        ),
+          },
+          [
+            h('span.backend-card__name', labelOf(item)),
+            item.description ? h('span.backend-card__desc', item.description) : null,
+          ]
+        );
 
-        storedKeys.length
-          ? h(
-              'datalist#known-endpoints',
-              [...new Set(storedKeys.map((c) => c.endpoint))].map((e) => h('option', { value: e }))
-            )
-          : null,
+      const search = h('input.input.backend-search', {
+        type: 'search',
+        value: state.search,
+        placeholder: t('form.search', { count: types.length }),
+        spellcheck: 'false',
+        'data-autofocus': 'true',
+        oninput: (e) => {
+          state.search = e.target.value;
+          // Repaint only the grid: rebuilding the input would lose the caret.
+          paintGrid();
+        },
+      });
 
+      const grid = h('div.backend-grid');
+
+      function paintGrid() {
+        const q = state.search.trim().toLowerCase();
+        const list = types.filter((item) => matchesQuery(item, q));
+        clear(grid);
+        if (!list.length) {
+          grid.appendChild(h('p.backend-none', t('form.noMatch', { query: state.search })));
+          return;
+        }
+        for (const item of list) grid.appendChild(card(item));
+      }
+
+      for (const item of matches) grid.appendChild(card(item));
+
+      return h('div.backend-pick', [search, h('div.backend-scroll', grid)]);
+    }
+
+    /* ------------------------------------------------------- step two */
+
+    function detailForm() {
+      const b = backend();
+      const rootSpec = b.root;
+
+      const rows = [];
+
+      // Which server and how to sign in, generated from rclone's own options.
+      if (state.reuseConnection && editedConn) {
+        rows.push(
+          h('div.saved-creds', [
+            h('div.saved-creds__mark', OM.icons.icon('key', 16)),
+            h('div.saved-creds__text', [
+              h('div.saved-creds__title', t('form.savedConnection')),
+              h('div.saved-creds__sub', editedConn.name),
+            ]),
+          ])
+        );
+      } else {
+        rows.push(...fields.render(b, state.values, setValue));
+      }
+
+      // The container that becomes the root of the drive.
+      if (rootSpec) {
+        rows.push(
+          field(
+            rootSpec.label,
+            h('input.input', {
+              type: 'text',
+              value: state.root,
+              placeholder: rootSpec.placeholder,
+              spellcheck: 'false',
+              disabled: Boolean(editing),
+              oninput: (e) => {
+                state.root = e.target.value.trim();
+              },
+            }),
+            {
+              required: rootSpec.required,
+              hint:
+                rootSpec.kind === 'path'
+                  ? t('form.rootHintPath')
+                  : t('form.rootHintContainer'),
+            }
+          )
+        );
+      }
+
+      rows.push(
         field(
-          'Nombre del bucket',
-          h('input.input', {
-            type: 'text',
-            value: data.bucket,
-            placeholder: 'mi-bucket',
-            'data-autofocus': '',
-            spellcheck: 'false',
-            oninput: (e) => {
-              data.bucket = e.target.value.trim();
-            },
-          }),
-          { required: true, hint: 'Tal y como se llama en el almacenamiento remoto.' }
-        ),
-
-        data.newCredentials ? credentialFields(data) : savedCredentials(currentKey),
-
-        field(
-          'Letra de la unidad',
+          t('form.driveLetter'),
           h(
             'select.select',
             {
               onchange: (e) => {
-                data.driveLetter = e.target.value;
+                state.driveLetter = e.target.value;
               },
             },
-            letterOptions.length
-              ? letterOptions.map((letter) =>
-                  h(
-                    'option',
-                    { value: letter, selected: letter === data.driveLetter },
-                    `${letter}:`
-                  )
-                )
-              : [h('option', { value: '' }, 'No hay letras libres')]
+            state.letters.map((l) =>
+              h('option', { value: l, selected: l === state.driveLetter }, `${l}:`)
+            )
           ),
-          { hint: 'Con la que aparecerá en el Explorador de Windows.' }
-        ),
+          { required: true, hint: t('form.driveLetterHint') }
+        )
+      );
 
-        moreOptions(data),
-      ]);
+      // Advanced options exist for every backend and are genuinely advanced,
+      // so they stay folded away.
+      const adv = fields.advanced(b);
+      if (adv.length) {
+        rows.push(
+          h('details.moreopts', [
+            h('summary', t('form.moreOptions', { count: adv.length })),
+            h('div.moreopts__body', fields.render(b, state.values, setValue, { advanced: true })),
+          ])
+        );
+      }
+
+      return h('div.driveform__fields', rows);
     }
 
-    function credentialFields(target) {
-      const secretInput = h('input.input.input--mono', {
-        type: 'password',
-        value: target.secretAccessKey,
-        placeholder: 'Secret Key',
-        autocomplete: 'off',
-        oninput: (e) => {
-          target.secretAccessKey = e.target.value;
-        },
-      });
+    /* ---------------------------------------------------------- submit */
 
-      return h('div.stack.stack--lg', [
-        h('div.form-row', [
-          field(
-            'Access Key',
-            h('input.input.input--mono', {
-              type: 'text',
-              value: target.accessKeyId,
-              placeholder: 'Access Key',
-              autocomplete: 'off',
-              spellcheck: 'false',
-              oninput: (e) => {
-                target.accessKeyId = e.target.value.trim();
-              },
-            }),
-            { required: true }
-          ),
-          field(
-            'Secret Key',
-            h('div.input-affix', [
-              secretInput,
-              h(
-                'button.input-affix__btn',
+    async function submit() {
+      const b = backend();
+      state.error = null;
+
+      if (!state.reuseConnection) {
+        const gaps = fields.missing(b, state.values);
+        if (gaps.length) {
+          state.error = t('form.required', { fields: gaps.join(', ') });
+          return paint();
+        }
+      }
+
+      if (b.root && b.root.required && !state.root) {
+        state.error = t('form.rootRequired', { label: b.root.label });
+        return paint();
+      }
+
+      state.busy = true;
+      paint();
+
+      // throwOnError rather than the default: the message belongs inside the
+      // form, next to the field that caused it, not in a toast that covers it.
+      let result;
+      try {
+        result = await app().call(
+          app().api.setup.createDrive({
+            id: editing ? editing.id : undefined,
+            type: state.type,
+            config: state.reuseConnection ? {} : state.values,
+            connectionId: state.reuseConnection ? state.connectionId : null,
+            root: state.root,
+            prefix: state.prefix,
+            name: state.name,
+            driveLetter: state.driveLetter,
+            readOnly: state.readOnly,
+            autoMount: state.autoMount,
+          }),
+          { silent: true, throwOnError: true }
+        );
+      } catch (err) {
+        state.busy = false;
+        state.error = err.message;
+        return paint();
+      }
+
+      state.busy = false;
+      modal.close();
+      OM.toast.success(editing ? t('form.updated') : t('form.created'));
+      if (opts.onDone) opts.onDone(result);
+    }
+
+    /* ----------------------------------------------------------- paint */
+
+    function paint() {
+      clear(body);
+      clear(footer);
+
+      if (!state.type) {
+        body.appendChild(typePicker());
+        footer.appendChild(
+          h('button.btn.btn--ghost', { type: 'button', onclick: () => modal.close() }, t('action.cancel'))
+        );
+        return;
+      }
+
+      const b = backend();
+
+      body.appendChild(
+        h('div.driveform__chosen', [
+          h('span.driveform__chosen-label', labelOf(b)),
+          editing
+            ? null
+            : h(
+                'button.btn.btn--link',
                 {
                   type: 'button',
-                  title: 'Mostrar u ocultar',
-                  onclick: (e) => {
-                    const showing = secretInput.type === 'text';
-                    secretInput.type = showing ? 'password' : 'text';
-                    mount(e.currentTarget, icon(showing ? 'eye' : 'eyeOff', 16));
+                  onclick: () => {
+                    state.type = null;
+                    state.error = null;
+                    paint();
                   },
                 },
-                icon('eye', 16)
+                t('action.change')
               ),
-            ]),
-            { required: true }
-          ),
-        ]),
-        h('div.field__hint', [
-          icon('lock', 12, 'inline-icon'),
-          ' Stored encrypted by the operating system; only your account can read them.',
-        ]),
-        savedKeys().length
-          ? h(
-              'button.linkish',
-              {
-                type: 'button',
-                onclick: () => {
-                  data.newCredentials = false;
-                  paint();
-                },
-              },
-              'Usar las claves ya guardadas'
-            )
-          : null,
-      ]);
-    }
+        ])
+      );
 
-    function savedCredentials(saved) {
-      return h('div.saved-creds', [
-        h('div.saved-creds__mark', icon('key', 16)),
-        h('div.saved-creds__text', [
-          h(
-            'div.saved-creds__title',
-            'Using your saved credentials'
-          ),
-          h('div.saved-creds__sub', saved ? saved.accessKeyId : ''),
-        ]),
+      body.appendChild(detailForm());
+
+      if (state.error) {
+        body.appendChild(h('div.formerror', [OM.icons.icon('alert', 16), state.error]));
+      }
+
+      footer.appendChild(
         h(
-          'button.linkish',
-          {
-            type: 'button',
-            onclick: () => {
-              data.newCredentials = true;
-              paint();
-            },
-          },
-          'Usar otras'
-        ),
-      ]);
-    }
-
-    function moreOptions(target) {
-      return h('details.more', [
-        h('summary.more__summary', [icon('chevronRight', 14), h('span', 'Más opciones')]),
-        h('div.more__body', [
-          h('div.form-row', [
-            field(
-              'Nombre a mostrar',
-              h('input.input', {
-                type: 'text',
-                value: target.name,
-                placeholder: target.bucket || 'El del bucket',
-                oninput: (e) => {
-                  target.name = e.target.value;
-                },
-              })
-            ),
-            field(
-              'Carpeta dentro del bucket',
-              h('input.input.input--mono', {
-                type: 'text',
-                value: target.prefix,
-                placeholder: 'todo el bucket',
-                oninput: (e) => {
-                  target.prefix = e.target.value.replace(/^\/+/, '').trim();
-                },
-              })
-            ),
-          ]),
-          switchRow('Montar al abrir OmniMount', target.autoMount, (v) => {
-            target.autoMount = v;
-          }),
-          switchRow('Solo lectura', target.readOnly, (v) => {
-            target.readOnly = v;
-          }, { hint: 'Impide escribir en el bucket desde este equipo.' }),
-        ]),
-      ]);
-    }
-
-    function showError(message) {
-      mount(errorSlot, [
-        h('div.alert.alert--error', [
-          icon('alert', 18, 'alert__icon'),
-          h('div.alert__body.selectable', message),
-        ]),
-      ]);
-      body.parentNode.scrollTop = 0;
+          'button.btn.btn--ghost',
+          { type: 'button', disabled: state.busy, onclick: () => modal.close() },
+          t('action.cancel')
+        )
+      );
+      footer.appendChild(
+        h(
+          'button.btn.btn--primary',
+          { type: 'button', disabled: state.busy, onclick: submit },
+          state.busy
+            ? [h('span.spinner'), editing ? t('action.saving') : t('action.creating')]
+            : [OM.icons.icon('plus', 16), editing ? t('action.save') : t('action.create')]
+        )
+      );
     }
 
     paint();
-
-    const handle = modal.open({
-      title: editing ? 'Editar unidad' : 'Nueva unidad',
-      description: editing
-        ? 'Los cambios se aplican al volver a montar.'
-        : 'Indica el bucket y tus claves de acceso. Del resto nos ocupamos nosotros.',
-      wide: true,
-      body,
-      footer: h('div.row', [
-        h('button.btn.btn--ghost', { type: 'button', onclick: () => handle.close() }, 'Cancelar'),
-        h(
-          'button.btn.btn--primary',
-          { type: 'button', onclick: (e) => submit(e.currentTarget) },
-          [
-            icon(editing ? 'check' : 'plus', 16, 'btn__icon'),
-            h('span', editing ? 'Guardar' : 'Crear unidad'),
-          ]
-        ),
-      ]),
-    });
-
-    async function submit(button) {
-      mount(errorSlot, []);
-
-      if (!data.endpoint) return showError('Enter the endpoint of the service.');
-      if (!data.bucket) return showError('Enter the bucket name.');
-      if (data.newCredentials && (!data.accessKeyId || !data.secretAccessKey)) {
-        return showError('Both the access key and the secret key are required.');
-      }
-      if (!data.driveLetter) {
-        return showError('No hay ninguna letra de unidad libre en este equipo.');
-      }
-
-      await withBusy(button, async () => {
-        const payload = {
-          id: data.id,
-          endpoint: data.endpoint,
-          bucket: data.bucket,
-          driveLetter: data.driveLetter,
-          name: data.name,
-          prefix: data.prefix,
-          readOnly: data.readOnly,
-          autoMount: data.autoMount,
-          connectionId: data.newCredentials ? null : data.connectionId,
-          accessKeyId: data.newCredentials ? data.accessKeyId : '',
-          secretAccessKey: data.newCredentials ? data.secretAccessKey : '',
-        };
-
-        // El alta valida el acceso real contra el bucket, así que su mensaje
-        // de error es el que hay que enseñar dentro del formulario.
-        let saved;
-        try {
-          saved = await app().call(app().api.setup.createDrive(payload), {
-            silent: true,
-            throwOnError: true,
-          });
-        } catch (err) {
-          showError(err.message);
-          return;
-        }
-
-        handle.close();
-        await Promise.all([app().loadMounts(), app().loadConnections()]);
-        app().refreshChrome();
-        app().navigate('dashboard', { focus: saved.id });
-
-        if (editing) {
-          toast.ok('Cambios guardados.');
-          return;
-        }
-
-        toast.ok(`Unidad "${saved.name}" creada.`);
-        const mounted = await app().call(app().api.mounts.mount(saved.id));
-        if (mounted) toast.ok(`Ya puedes usar ${saved.driveLetter}: en el Explorador.`, 'Lista');
-      });
-    }
+    return modal;
   }
 
-  global.OM = global.OM || {};
-  global.OM.driveForm = { open };
-})(window);
+  return { open };
+})();

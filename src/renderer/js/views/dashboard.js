@@ -43,7 +43,7 @@
           h(
             'p.view__sub',
             mounts.length
-              ? 'Cada unidad es un bucket publicado como disco de red en este equipo.'
+              ? t('drives.subtitle')
               : 'Todavía no hay ninguna unidad configurada.'
           ),
         ]),
@@ -140,12 +140,12 @@
     return h('div.card', [
       h('div.empty', [
         h('div.empty__art', icon('drive', 34)),
-        h('h2.empty__title', 'Conecta tu primer bucket'),
+        h('h2.empty__title', t('drives.emptyTitle')),
         h(
           'p.empty__text',
           hasKeys
-            ? 'Indica el bucket y aparecerá como una unidad más en el Explorador.'
-            : 'Indica el bucket y tus claves de acceso. En unos segundos lo tendrás como una unidad de Windows.'
+            ? t('drives.emptyText')
+            : t('drives.emptyText')
         ),
         h('div.empty__actions', [
           h(
@@ -204,7 +204,7 @@
           ]),
           h(
             'div.drive__path',
-            `${mountCfg.bucket}${mountCfg.prefix ? `/${mountCfg.prefix}` : ''}`
+            `${mountCfg.root || mountCfg.bucket || ''}${mountCfg.prefix ? `/${mountCfg.prefix}` : ''}`
           ),
           h('div.drive__meta', [
             h(
@@ -438,7 +438,7 @@
     const confirmed = await modal.confirm({
       title: `¿Eliminar "${mountCfg.name}"?`,
       message: 'Se borra la configuración de esta unidad en OmniMount.',
-      detail: 'El contenido del bucket no se toca: sólo se elimina el montaje en este equipo.',
+      detail: t('drives.removeDetail'),
       confirmLabel: 'Eliminar',
       danger: true,
     });

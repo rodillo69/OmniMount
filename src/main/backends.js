@@ -54,6 +54,30 @@ const NEEDS_OAUTH = new Set([
   'gofile',
 ]);
 
+/**
+ * Backends that wrap another remote instead of reaching a server.
+ *
+ * `alias`, `crypt`, `cache`, `union` and friends take an existing remote and
+ * change how it behaves. They are useful, but they cannot be the thing you
+ * connect to: offering "Alias for an existing remote" in a list of storage
+ * services is an invitation to pick something that cannot work on its own.
+ * `local` is excluded for the same reason from the other direction: a local
+ * folder does not need mounting as a drive.
+ */
+const WRAPPERS = new Set([
+  'alias',
+  'archive',
+  'cache',
+  'chunker',
+  'combine',
+  'compress',
+  'crypt',
+  'hasher',
+  'union',
+  'memory',
+  'local',
+]);
+
 /** Friendlier names than rclone's own, where its description is a mouthful. */
 const LABELS = {
   s3: 'S3 compatible storage',
@@ -154,12 +178,21 @@ async function catalogue() {
 
   const providers = await readProviders();
   const types = providers
+    // Wrappers cannot stand alone, and the OAuth ones cannot be set up from a
+    // form at all. Showing either would offer a choice that leads nowhere, so
+    // the catalogue contains only what the app can actually connect to.
+    .filter((provider) => !WRAPPERS.has(provider.Name) && !NEEDS_OAUTH.has(provider.Name))
     .map((provider) => {
       const fields = (provider.Options || []).filter((o) => !o.Hide).map(toField);
       return {
         name: provider.Name,
         label: LABELS[provider.Name] || provider.Description,
-        description: provider.Description,
+        // Most backends describe themselves with their own name, which would
+        // print twice on a card. Only keep a description that adds something.
+        description:
+          (LABELS[provider.Name] || provider.Description) === provider.Description
+            ? ''
+            : provider.Description,
         featured: FEATURED.includes(provider.Name),
         order: FEATURED.indexOf(provider.Name),
         needsOAuth: NEEDS_OAUTH.has(provider.Name),

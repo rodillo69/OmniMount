@@ -272,6 +272,7 @@
 
     api.settings.onChanged((settings) => {
       state.settings = settings;
+      OM.i18n.setLanguage(settings.language);
       applyTheme(settings.theme);
     });
 
@@ -323,6 +324,9 @@
   async function boot() {
     state.appInfo = (await call(api.app.info(), { silent: true })) || {};
     state.settings = (await call(api.settings.get(), { silent: true })) || {};
+    // Language before anything is painted, or the first frame renders in the
+    // wrong one and flickers when it corrects itself.
+    OM.i18n.setLanguage(state.settings.language);
     applyTheme(state.settings.theme);
 
     // Las escuchas se ponen ANTES de pedir los datos: si se montara algo
@@ -442,13 +446,13 @@
     OM.dom.clear(host);
 
     host.appendChild(
-      button('min', 'Minimizar', 'M0.5 5.5 H9.5', () => window.omni.window.minimize())
+      button('min', t('window.minimize'), 'M0.5 5.5 H9.5', () => window.omni.window.minimize())
     );
 
     host.appendChild(
       button(
         'max',
-        isMaximized ? 'Restaurar' : 'Maximizar',
+        isMaximized ? t('window.restore') : t('window.maximize'),
         isMaximized
           ? ['M0.5 3.5 H6.5 V9.5 H0.5 Z', 'M3 3.5 V1 H9 V7 H6.5']
           : 'M0.5 0.5 H9.5 V9.5 H0.5 Z',
@@ -460,7 +464,7 @@
     );
 
     host.appendChild(
-      button('close', 'Cerrar', ['M0.5 0.5 L9.5 9.5', 'M9.5 0.5 L0.5 9.5'], () =>
+      button('close', t('window.close'), ['M0.5 0.5 L9.5 9.5', 'M9.5 0.5 L0.5 9.5'], () =>
         window.omni.window.close()
       )
     );

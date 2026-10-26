@@ -1,4 +1,4 @@
-/* OmniMount - explorador del bucket.
+/* OmniMount - explorador del almacenamiento remoto.
    Habla S3 directamente, así que funciona con la unidad desmontada. */
 (function (global) {
   'use strict';
@@ -97,7 +97,7 @@
         h('h1.view__title', 'Explorador'),
         h(
           'p.view__sub',
-          'Navega por el bucket sin necesidad de montar la unidad. Las operaciones van directas al almacenamiento remoto.'
+          'Navega por el almacenamiento sin montar la unidad. Las operaciones van directas al servidor remoto.'
         ),
       ]),
       mounts.length
@@ -129,7 +129,7 @@
       h('div.empty', [
         h('div.empty__art', icon('folder', 34)),
         h('h2.empty__title', 'No hay nada que explorar'),
-        h('p.empty__text', 'Crea una unidad y podrás navegar por su bucket desde aquí.'),
+        h('p.empty__text', 'Crea una unidad y podrás navegar por su contenido desde aquí.'),
         h('div.empty__actions', [
           h(
             'button.btn.btn--primary.btn--lg',
@@ -158,7 +158,7 @@
           type: 'button',
           onclick: () => parts.length && goTo(base),
         },
-        [icon('bucket', 13), ' ', target.bucket + (target.prefix ? `/${target.prefix}` : '')]
+        [icon('bucket', 13), ' ', (target.root || target.bucket || '') + (target.prefix ? `/${target.prefix}` : '')]
       ),
     ];
 
@@ -241,7 +241,7 @@
     const result = await app().call(
       app().api.explorer.list({
         connectionId: target.connectionId,
-        bucket: target.bucket,
+        root: target.root || target.bucket,
         prefix: view.prefix,
         token: append ? view.nextToken : undefined,
       }),
@@ -251,7 +251,7 @@
     view.loading = false;
 
     if (!result) {
-      view.error = 'No se pudo leer el contenido del bucket.';
+      view.error = 'No se pudo leer el contenido remoto.';
       paintList();
       paintFoot();
       return;
@@ -433,7 +433,7 @@
       const result = await app().call(
         app().api.explorer.upload({
           connectionId: target.connectionId,
-          bucket: target.bucket,
+          root: target.root || target.bucket,
           prefix: view.prefix,
         })
       );
@@ -467,7 +467,7 @@
       const result = await app().call(
         app().api.explorer.download({
           connectionId: target.connectionId,
-          bucket: target.bucket,
+          root: target.root || target.bucket,
           items: files,
         })
       );
@@ -503,7 +503,7 @@
       const result = await app().call(
         app().api.explorer.remove({
           connectionId: target.connectionId,
-          bucket: target.bucket,
+          root: target.root || target.bucket,
           items,
         })
       );
@@ -533,7 +533,7 @@
     const done = await app().call(
       app().api.explorer.mkdir({
         connectionId: target.connectionId,
-        bucket: target.bucket,
+        root: target.root || target.bucket,
         prefix: view.prefix,
         name,
       })
@@ -566,7 +566,7 @@
     const done = await app().call(
       app().api.explorer.rename({
         connectionId: target.connectionId,
-        bucket: target.bucket,
+        root: target.root || target.bucket,
         key: item.key,
         newName: name,
       })
@@ -585,7 +585,7 @@
       const usage = await app().call(
         app().api.explorer.usage({
           connectionId: target.connectionId,
-          bucket: target.bucket,
+          root: target.root || target.bucket,
           prefix: view.prefix,
         })
       );
