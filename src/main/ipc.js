@@ -6,6 +6,7 @@ const store = require('./store');
 const deps = require('./deps');
 const backends = require('./backends');
 const remoteFs = require('./remote-fs');
+const updater = require('./updater');
 const drives = require('./drives');
 const defaults = require('./defaults');
 const rclone = require('./rclone');
@@ -335,6 +336,14 @@ function register() {
    * Regiones disponibles y qué claves hay guardadas en cada una. El alta usa
    * esto para pedir credenciales sólo cuando la región elegida no las tiene.
    */
+  /* ----------------------------------------------------------- updates */
+
+  updater.register(send);
+  handle('update:state', () => updater.getState());
+  handle('update:check', () => updater.check());
+  handle('update:download', () => updater.download());
+  handle('update:install', () => updater.installNow());
+
   /* ------------------------------------------------------- window frame */
 
   // The title bar is ours, so minimise/maximise/close arrive over IPC.

@@ -50,11 +50,22 @@ module.exports = {
     output: 'dist',
     buildResources: 'build',
   },
-  files: ['src/**/*', '!**/*.map'],
+  files: ['src/**/*', 'package.json', '!**/*.map'],
   win: {
     target: [{ target: 'nsis', arch: ['x64'] }],
     icon: 'build/icon.png',
+    // The version must stay in the name. The updater finds the previous
+    // installer's blockmap by swapping the new version for the old one in
+    // this very path; without it there are no differential downloads.
     artifactName: 'OmniMount-Setup-${version}.${ext}',
+    // Opting out of Authenticode verification explicitly, because this build
+    // is unsigned. Today it changes nothing: with no publisher name in
+    // app-update.yml the check is skipped anyway. It matters from
+    // electron-builder 27, which rejects unverifiable updates instead, and
+    // the file that decides is the one shipped in the INSTALLER ALREADY ON
+    // THE USER'S MACHINE. Adding this later would be too late for everyone
+    // who installed before.
+    verifyUpdateCodeSignature: false,
     ...sign,
   },
   nsis: {
@@ -73,6 +84,10 @@ module.exports = {
       provider: 'github',
       owner: 'rodillo69',
       repo: 'OmniMount',
+      // The default is 'draft', and a draft release is invisible to the
+      // updater: the app would report itself up to date while a new version
+      // sat unpublished.
+      releaseType: 'release',
     },
   ],
 };

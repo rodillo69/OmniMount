@@ -54,6 +54,14 @@ contextBridge.exposeInMainWorld('omni', {
     onState: (cb) => subscribe('window:state', cb),
   },
 
+  update: {
+    state: () => invoke('update:state'),
+    check: () => invoke('update:check'),
+    download: () => invoke('update:download'),
+    install: () => invoke('update:install'),
+    onState: (cb) => subscribe('update:state', cb),
+  },
+
   backends: {
     list: () => invoke('backends:list'),
     get: (name) => invoke('backends:get', name),

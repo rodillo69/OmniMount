@@ -127,14 +127,25 @@ function navigate(payload) {
   }
 }
 
-async function quitApp() {
+/**
+ * Leave cleanly.
+ *
+ * `alreadyUnmounted` is for the updater, which unmounts before handing over
+ * to the installer. Without it the drives would be torn down a second time
+ * here, in parallel with the installer's own countdown.
+ */
+async function quitApp({ alreadyUnmounted = false } = {}) {
   if (quitting) return;
   quitting = true;
-  try {
-    await mounts.shutdown();
-  } catch (err) {
-    log.error('Fallo al desmontar durante la salida:', err.message);
+
+  if (!alreadyUnmounted) {
+    try {
+      await mounts.shutdown();
+    } catch (err) {
+      log.error('Unmounting on exit failed:', err.message);
+    }
   }
+
   tray.destroy();
   app.quit();
 }
@@ -162,6 +173,17 @@ app.whenReady().then(async () => {
   // Mantiene el elemento de inicio al día por si se cambió desde la
   // configuración de Windows.
   ipc.applyLoginItem();
+
+  // The updater unmounts before installing, so the quit path must not do it
+  // again while the installer is already counting down.
+  const updater = require('./updater');
+  updater.onBeforeInstall = () => {
+    quitting = true;
+  };
+
+  // Deferred: the window has to be listening before the first update:state
+  // event is sent, or the result is simply lost.
+  setTimeout(() => updater.check(), 8000);
 
   if (settings.mountOnStart) {
     const auto = store.listMounts().filter((m) => m.autoMount);
