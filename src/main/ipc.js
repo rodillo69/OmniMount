@@ -4,7 +4,8 @@ const path = require('node:path');
 const { ipcMain, dialog, shell, app, nativeTheme } = require('electron');
 const store = require('./store');
 const deps = require('./deps');
-const s3 = require('./s3');
+const backends = require('./backends');
+const remoteFs = require('./remote-fs');
 const drives = require('./drives');
 const defaults = require('./defaults');
 const rclone = require('./rclone');
@@ -68,24 +69,65 @@ function applyLoginItem() {
   });
 }
 
-/** Resolve a connection with its decrypted secret, for S3 calls. */
-async function liveConnection(connectionId, overrides) {
-  if (overrides && overrides.accessKeyId && overrides.secretAccessKey) {
+/**
+ * A connection ready to hand to rclone.
+ *
+ * `draft` lets the form test credentials that have not been saved yet: it
+ * carries the same shape a stored connection has once decrypted, so both
+ * paths produce exactly the same thing and the test cannot differ from the
+ * real mount.
+ */
+async function liveConnection(connectionId, draft) {
+  if (draft && draft.type) {
     return {
-      endpoint: store.normaliseEndpoint(overrides.endpoint),
-      region: overrides.region || 'us-east-1',
-      accessKeyId: overrides.accessKeyId,
-      secretAccessKey: overrides.secretAccessKey,
-      forcePathStyle: overrides.forcePathStyle !== false,
-      noCheckBucket: overrides.noCheckBucket !== false,
+      type: draft.type,
+      config: draft.config || {},
+      obscuredFields: draft.obscuredFields || [],
     };
   }
+
   const conn = await store.getConnectionSecret(connectionId);
-  if (!conn) throw new Error('La conexion no existe.');
-  if (!conn.secretAccessKey) {
-    throw new Error('La conexion no tiene Secret Key guardada. Editala para volver a introducirla.');
+  if (!conn) throw new Error('That connection no longer exists.');
+  if (conn.needsSecret && !conn.hasSecret) {
+    throw new Error('This connection has no stored credentials. Edit it to enter them again.');
   }
   return conn;
+}
+
+/**
+ * Check a draft against the backend catalogue before anything is saved.
+ *
+ * rclone states which of its own fields are required, so the rules come from
+ * there rather than from a list kept in step by hand.
+ */
+async function validateDraft(type, config) {
+  const backend = await backends.byName(type);
+  if (!backend) throw new Error(`Unknown storage type: ${type}`);
+  if (backend.needsOAuth) {
+    throw new Error(`${backend.label} needs browser sign-in, which is not supported yet.`);
+  }
+
+  const missing = backend.fields
+    .filter((f) => f.required && !f.advanced)
+    .filter((f) => {
+      const value = config[f.name];
+      return value === undefined || value === null || String(value).trim() === '';
+    })
+    .map((f) => f.label);
+
+  if (missing.length) {
+    throw new Error(`These fields are required: ${missing.join(', ')}.`);
+  }
+
+  return backend;
+}
+
+
+/** A default name for a connection: the server it points at. */
+function connectionName(backend, config) {
+  const host = config.endpoint || config.url || config.host || '';
+  const clean = String(host).replace(/^[a-z]+:[/][/]/, '').replace(/[/]+$/, '');
+  return clean || backend.label;
 }
 
 function register() {
@@ -165,97 +207,98 @@ function register() {
     return true;
   });
 
-  handle('conn:test', async ({ connectionId, bucket, draft } = {}) => {
+  handle('conn:test', async ({ connectionId, root, draft } = {}) => {
     const conn = await liveConnection(connectionId, draft);
-    return s3.testConnection(conn, bucket || undefined);
+    return remoteFs.test(conn, root || '');
   });
 
-  handle('conn:listBuckets', async ({ connectionId, draft } = {}) => {
-    const conn = await liveConnection(connectionId, draft);
-    return s3.listBuckets(conn);
-  });
+  /* ---------------------------------------------------------- backends */
+
+  /** Every storage type the installed rclone supports, with its own fields. */
+  handle('backends:list', () => backends.catalogue());
+  handle('backends:get', (name) => backends.byName(name));
 
   /* -------------------------------------------------------------- disco */
 
   handle('drives:free', () => drives.freeLetters());
   handle('drives:suggest', (preferred) => drives.suggestLetter(preferred || []));
 
-  /* ------------------------------------------------------- alta simple */
+  /* ------------------------------------------------------ drive creation */
 
   /**
-   * Alta de unidad en una sola llamada: comprueba el acceso, reutiliza o crea
-   * la conexión y guarda el montaje.
+   * Create a drive in one call: validate the fields, check the remote is
+   * reachable, reuse or create the connection, then save the mount.
    *
-   * La interfaz aporta región, bucket y, si hacen falta, las claves. El
-   * endpoint sale de la región elegida: no se teclea.
+   * The handler knows nothing about any particular backend. The renderer
+   * sends the storage type and a bag of values named after rclone's own
+   * fields; the catalogue says which are required and which are secret.
    */
   handle('setup:createDrive', async (input) => {
     const data = input || {};
-    const bucket = String(data.bucket || '').trim().replace(/^\/+|\/+$/g, '');
-    if (!bucket) throw new Error('Escribe el nombre del bucket.');
+    const type = data.type || 's3';
 
-    const endpoint = store.normaliseEndpoint(data.endpoint);
-    if (!endpoint) throw new Error('An endpoint is required.');
+    const backend = await validateDraft(type, data.config || {});
 
-    // Credenciales: las nuevas que llegan, o las de una conexión ya guardada.
+    // The root is the bucket, container, share or folder the drive starts at,
+    // depending on the backend. Some have none at all.
+    const root = String(data.root || '').trim().replace(/^\/+|\/+$/g, '');
+    if (backend.root && backend.root.required && !root) {
+      throw new Error(`${backend.root.label} is required.`);
+    }
+
+    // Split what the user typed into plain values and ones to encrypt.
+    const secretNames = new Set(backend.fields.filter((f) => f.secret || f.sensitive).map((f) => f.name));
+    const obscuredFields = backend.fields.filter((f) => f.secret).map((f) => f.name);
+
+    const config = {};
+    const secrets = {};
+    for (const [key, value] of Object.entries(data.config || {})) {
+      if (value === undefined || value === null || value === '') continue;
+      if (secretNames.has(key)) secrets[key] = String(value);
+      else config[key] = String(value);
+    }
+
     let connectionId = data.connectionId || null;
     let probe;
 
-    if (data.accessKeyId && data.secretAccessKey) {
-      probe = {
-        endpoint,
-        region: data.signingRegion || defaults.S3.signingRegion,
-        accessKeyId: String(data.accessKeyId).trim(),
-        secretAccessKey: String(data.secretAccessKey),
-        forcePathStyle: defaults.S3.forcePathStyle,
-        noCheckBucket: defaults.S3.noCheckBucket,
-      };
-    } else if (connectionId) {
-      probe = await store.getConnectionSecret(connectionId);
-      if (!probe || !probe.secretAccessKey) {
-        throw new Error('No se pudieron recuperar las claves guardadas. Introdúcelas de nuevo.');
-      }
-      // Credentials belong to the server they were issued for. Reusing them
-      // elsewhere fails with an opaque error from the service, so it is
-      // caught here with something the user can act on.
-      if (probe.endpoint !== endpoint) {
-        throw new Error(
-          `Those credentials belong to ${probe.endpoint}, not to ${endpoint}.`
-        );
-      }
+    if (Object.keys(secrets).length || !connectionId) {
+      probe = { type, config: { ...config, ...secrets }, obscuredFields };
     } else {
-      throw new Error('Access credentials are required.');
+      probe = await store.getConnectionSecret(connectionId);
+      if (!probe) throw new Error('The stored credentials could not be read. Enter them again.');
     }
 
-    // Se comprueba contra el bucket real antes de guardar nada: así el error
-    // aparece en el formulario y no como un montaje que falla después.
-    const test = await s3.testConnection(probe, bucket);
+    // Check against the real server before saving anything, so a bad value
+    // shows up in the form rather than as a mount that fails later.
+    const test = await remoteFs.test(probe, root);
     if (!test.ok) {
       const err = new Error(test.message);
-      err.field = /clave|firma|Signature|AccessKey/i.test(test.message) ? 'credentials' : 'bucket';
+      err.field = /credential|rejected|login|key|secret/i.test(test.message)
+        ? 'credentials'
+        : 'root';
       throw err;
     }
 
-    if (data.accessKeyId && data.secretAccessKey) {
-      // Reuse an existing connection with the same key on the same server
-      // rather than accumulating duplicates. The endpoint is part of the
-      // comparison because the same key id may exist on several servers.
+    if (Object.keys(secrets).length) {
+      // Reuse a connection that already points at the same place with the
+      // same identity, rather than accumulating duplicates.
+      const fingerprint = JSON.stringify(config);
       const existing = store
         .listConnections()
-        .find((c) => c.accessKeyId === probe.accessKeyId && c.endpoint === endpoint);
+        .find((c) => c.type === type && JSON.stringify(c.config || {}) === fingerprint);
 
       const saved = await store.saveConnection({
         id: existing ? existing.id : undefined,
-        name: existing ? existing.name : endpoint.replace(/^https?:[/][/]/, ''),
-        endpoint,
-        region: data.signingRegion || defaults.S3.signingRegion,
-        accessKeyId: probe.accessKeyId,
-        secretAccessKey: probe.secretAccessKey,
-        forcePathStyle: defaults.S3.forcePathStyle,
-        noCheckBucket: defaults.S3.noCheckBucket,
+        name: existing ? existing.name : connectionName(backend, config),
+        type,
+        config,
+        secrets,
+        obscuredFields,
       });
       connectionId = saved.id;
     }
+
+    if (!connectionId) throw new Error('Credentials are required.');
 
     const letter =
       data.driveLetter || (await drives.suggestLetter(['S', 'T', 'U', 'V', 'W', 'Y', 'Z']));
@@ -265,12 +308,13 @@ function register() {
 
     const saved = store.saveMount({
       id: data.id || undefined,
-      name: (data.name || '').trim() || bucket,
+      name: (data.name || '').trim() || root || backend.label,
       connectionId,
-      bucket,
+      root,
+      bucket: root,
       prefix: data.prefix || '',
       driveLetter: letter,
-      volumeLabel: (data.name || '').trim() || bucket,
+      volumeLabel: (data.name || '').trim() || root || backend.label,
       readOnly: Boolean(data.readOnly),
       autoMount: data.autoMount !== false,
       ...defaults.MOUNT,
@@ -389,54 +433,52 @@ function register() {
 
   /* --------------------------------------------------------- explorador */
 
-  handle('explorer:list', async ({ connectionId, bucket, prefix, token } = {}) => {
+  handle('explorer:list', async ({ connectionId, root, prefix } = {}) => {
     const conn = await liveConnection(connectionId);
-    return s3.listObjects(conn, { bucket, prefix: prefix || '', token, maxKeys: 500 });
+    return remoteFs.list(conn, root, prefix || '');
   });
 
-  handle('explorer:usage', async ({ connectionId, bucket, prefix } = {}) => {
+  handle('explorer:usage', async ({ connectionId, root, prefix } = {}) => {
     const conn = await liveConnection(connectionId);
-    return s3.prefixUsage(conn, bucket, prefix || '');
+    return remoteFs.usage(conn, root, prefix || '');
   });
 
-  handle('explorer:mkdir', async ({ connectionId, bucket, prefix, name } = {}) => {
+  handle('explorer:mkdir', async ({ connectionId, root, prefix, name } = {}) => {
     if (!String(name || '').trim()) throw new Error('Hace falta un nombre de carpeta.');
     if (/[\\/]/.test(name)) throw new Error('El nombre de carpeta no puede contener barras.');
     const conn = await liveConnection(connectionId);
-    return s3.createFolder(conn, bucket, `${prefix || ''}${name.trim()}`);
+    return remoteFs.createFolder(conn, root, `${prefix || ''}${name.trim()}`);
   });
 
-  handle('explorer:delete', async ({ connectionId, bucket, items } = {}) => {
+  handle('explorer:delete', async ({ connectionId, root, items } = {}) => {
     const conn = await liveConnection(connectionId);
     const files = (items || []).filter((i) => i.type === 'file').map((i) => i.key);
     const folders = (items || []).filter((i) => i.type === 'folder').map((i) => i.key);
 
     const summary = { deleted: 0, errors: [] };
     if (files.length) {
-      const res = await s3.deleteObjects(conn, bucket, files);
-      summary.deleted += res.deleted;
-      summary.errors.push(...res.errors);
+      const res = await remoteFs.deleteFiles(conn, root, files);
+      summary.deleted += res.removed;
     }
     for (const folder of folders) {
-      const res = await s3.deletePrefix(conn, bucket, folder);
-      summary.deleted += res.deleted;
-      summary.errors.push(...res.errors);
+      await remoteFs.deleteFolder(conn, root, folder);
+      summary.deleted += 1;
     }
     return summary;
   });
 
-  handle('explorer:rename', async ({ connectionId, bucket, key, newName } = {}) => {
+  handle('explorer:rename', async ({ connectionId, root, key, newName } = {}) => {
     if (!String(newName || '').trim()) throw new Error('Hace falta un nombre.');
     if (/[\\/]/.test(newName)) throw new Error('El nombre no puede contener barras.');
     const conn = await liveConnection(connectionId);
     const parent = key.includes('/') ? `${key.slice(0, key.lastIndexOf('/'))}/` : '';
-    return s3.renameObject(conn, bucket, key, `${parent}${newName.trim()}`);
+    return remoteFs.rename(conn, root, key, `${parent}${newName.trim()}`);
   });
 
-  handle('explorer:upload', async ({ connectionId, bucket, prefix } = {}) => {
+  handle('explorer:upload', async ({ connectionId, root, prefix } = {}) => {
     const conn = await liveConnection(connectionId);
     const { canceled, filePaths } = await dialog.showOpenDialog(window, {
-      title: 'Subir al bucket',
+      title: 'Upload files',
       properties: ['openFile', 'multiSelections'],
     });
     if (canceled || !filePaths.length) return { uploaded: 0, canceled: true };
@@ -452,7 +494,7 @@ function register() {
         total: filePaths.length,
       });
       try {
-        await s3.putFile(conn, bucket, `${prefix || ''}${name}`, file, guessType(name));
+        await remoteFs.upload(conn, root, `${prefix || ''}${name}`, file);
         results.uploaded += 1;
       } catch (err) {
         results.errors.push({ name, message: err.message });
@@ -462,7 +504,7 @@ function register() {
     return results;
   });
 
-  handle('explorer:download', async ({ connectionId, bucket, items } = {}) => {
+  handle('explorer:download', async ({ connectionId, root, items } = {}) => {
     const conn = await liveConnection(connectionId);
     const files = (items || []).filter((i) => i.type === 'file');
     if (!files.length) throw new Error('Selecciona al menos un fichero.');
@@ -484,7 +526,7 @@ function register() {
         total: files.length,
       });
       try {
-        await s3.getObjectToFile(conn, bucket, item.key, path.join(target, safeName(item.name)));
+        await remoteFs.download(conn, root, item.key, path.join(target, safeName(item.name)));
         results.downloaded += 1;
       } catch (err) {
         results.errors.push({ name: item.name, message: err.message });

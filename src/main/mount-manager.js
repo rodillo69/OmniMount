@@ -108,14 +108,19 @@ class MountManager extends EventEmitter {
       await this.preflight(mount);
 
       const connection = await store.getConnectionSecret(mount.connectionId);
-      if (!connection) throw new Error('La conexion asociada ya no existe.');
-      if (!connection.secretAccessKey) {
-        throw new Error('No se pudo recuperar la Secret Key guardada. Vuelve a introducirla en la conexion.');
+      if (!connection) throw new Error('The connection this drive uses no longer exists.');
+      // Backends differ in what they need: a key pair, a password, a token, or
+      // nothing at all for anonymous HTTP. The connection records whether a
+      // secret is expected, so this check works for every type.
+      if (connection.needsSecret && !connection.hasSecret) {
+        throw new Error(
+          'The stored credentials could not be read. Open the connection and enter them again.'
+        );
       }
 
       const rc = rclone.newRcSession(await rclone.freePort());
       const args = rclone.buildMountArgs(mount, rc);
-      const env = rclone.buildEnv(connection);
+      const env = await rclone.buildEnv(connection);
 
       if (mount.cacheMode === 'writes' || mount.cacheMode === 'full') {
         fs.mkdirSync(mountCacheDir(mount.id), { recursive: true });

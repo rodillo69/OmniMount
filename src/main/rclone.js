@@ -28,34 +28,73 @@ function emptyConfigPath() {
 }
 
 /**
+ * Obscure a password the way rclone stores them.
+ *
+ * rclone rejects a plain-text password in `pass`-type fields: it expects its
+ * own reversible obscuring. The value is piped through `rclone obscure -` on
+ * stdin rather than passed as an argument, because a command line is readable
+ * by any process on the machine while a pipe is not. The algorithm is not
+ * reimplemented here on purpose: it is rclone's, and it should stay rclone's.
+ */
+function obscure(value) {
+  return new Promise((resolve, reject) => {
+    if (!value) return resolve('');
+
+    const child = execFile(
+      rcloneExe,
+      ['obscure', '-'],
+      { windowsHide: true },
+      (err, stdout, stderr) => {
+        if (err) return reject(new Error(`rclone obscure failed: ${stderr || err.message}`));
+        resolve(String(stdout).trim());
+      }
+    );
+    child.stdin.end(String(value), 'utf8');
+  });
+}
+
+/**
+ * Build the environment that defines the remote for a single rclone run.
+ *
  * Credentials go in the environment, never in argv: a process command line is
  * readable by other processes on the machine (WMI, Get-Process), an
  * environment block is not.
+ *
+ * The remote is defined entirely by RCLONE_CONFIG_<NAME>_* variables, so
+ * nothing is ever written to an rclone config file on disk. Field names come
+ * straight from the backend catalogue, which reads them from rclone itself,
+ * so any backend rclone supports can be described here without this function
+ * knowing anything about it.
  */
-function buildEnv(connection, extra = {}) {
-  return {
+async function buildEnv(connection, extra = {}) {
+  const env = {
     ...process.env,
-    [`RCLONE_CONFIG_${REMOTE}_TYPE`]: 's3',
-    // "Other" is the generic S3 profile; StorageGRID is not a named provider
-    // in rclone and the generic one behaves correctly against it.
-    [`RCLONE_CONFIG_${REMOTE}_PROVIDER`]: 'Other',
-    [`RCLONE_CONFIG_${REMOTE}_ACCESS_KEY_ID`]: connection.accessKeyId,
-    [`RCLONE_CONFIG_${REMOTE}_SECRET_ACCESS_KEY`]: connection.secretAccessKey,
-    [`RCLONE_CONFIG_${REMOTE}_ENDPOINT`]: connection.endpoint,
-    [`RCLONE_CONFIG_${REMOTE}_REGION`]: connection.region || 'us-east-1',
-    [`RCLONE_CONFIG_${REMOTE}_FORCE_PATH_STYLE`]:
-      connection.forcePathStyle === false ? 'false' : 'true',
-    // Without this rclone probes or tries to create the bucket on mount, which
-    // fails when the key has no bucket-level permissions.
-    [`RCLONE_CONFIG_${REMOTE}_NO_CHECK_BUCKET`]:
-      connection.noCheckBucket === false ? 'false' : 'true',
+    [`RCLONE_CONFIG_${REMOTE}_TYPE`]: connection.type || 's3',
     RCLONE_CONFIG: emptyConfigPath(),
-    ...extra,
   };
+
+  const config = connection.config || {};
+  const secretFields = new Set(connection.obscuredFields || []);
+
+  for (const [key, value] of Object.entries(config)) {
+    if (value === undefined || value === null || value === '') continue;
+    const name = `RCLONE_CONFIG_${REMOTE}_${key.toUpperCase()}`;
+    // Password-type fields must be stored obscured or rclone refuses them.
+    env[name] = secretFields.has(key) ? await obscure(value) : String(value);
+  }
+
+  return { ...env, ...extra };
 }
 
+/**
+ * The remote path to mount.
+ *
+ * `root` is whatever the backend calls its top level: a bucket for S3, a
+ * container for Swift, a share for SMB, a folder for SFTP and FTP. Backends
+ * with no container at all leave it empty and mount from the server root.
+ */
 function remotePath(mount) {
-  const parts = [mount.bucket, mount.prefix].filter(Boolean).join('/');
+  const parts = [mount.root || mount.bucket, mount.prefix].filter(Boolean).join('/');
   return `${REMOTE}:${parts}`;
 }
 
@@ -246,9 +285,10 @@ function run(args, env, timeout = 60000) {
 
 /** Ask rclone itself whether it can read the remote, as a pre-mount check. */
 async function probeRemote(mount, connection) {
-  const env = buildEnv(connection);
+  const env = await buildEnv(connection);
   const target = remotePath(mount);
-  await run(['lsjson', target, '--max-depth', '1', '--limit', '1'], env, 30000);
+  // lsjson has no --limit flag; lsf keeps the reply small on a big remote.
+  await run(['lsf', target, '--max-depth', '1'], env, 30000);
   return true;
 }
 
@@ -265,6 +305,8 @@ async function version() {
 
 module.exports = {
   REMOTE,
+  run,
+  obscure,
   buildEnv,
   buildMountArgs,
   remotePath,

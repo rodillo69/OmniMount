@@ -6,7 +6,7 @@ const { safeStorage } = require('electron');
 const { configFile, dirs } = require('./paths');
 const log = require('./logger').scoped('store');
 
-const CONFIG_VERSION = 2;
+const CONFIG_VERSION = 3;
 
 const DEFAULTS = {
   version: CONFIG_VERSION,
@@ -115,6 +115,33 @@ function migrate() {
     for (const mount of state.mounts) mount.autoMount = true;
   }
 
+  // v3 generalises a connection from "an S3 account" to "any rclone backend".
+  // The old shape kept endpoint and keys as top-level fields; they move into
+  // `config` under the names rclone itself uses.
+  for (const conn of state.connections) {
+    if (conn.config) continue;
+    conn.type = 's3';
+    conn.config = {
+      provider: 'Other',
+      endpoint: conn.endpoint,
+      region: conn.region || 'us-east-1',
+      access_key_id: conn.accessKeyId,
+      force_path_style: conn.forcePathStyle !== false ? 'true' : 'false',
+      no_check_bucket: conn.noCheckBucket !== false ? 'true' : 'false',
+    };
+    conn.secrets = conn.secret ? { secret_access_key: conn.secret } : {};
+    conn.obscuredFields = [];
+    delete conn.secret;
+    delete conn.accessKeyId;
+    delete conn.forcePathStyle;
+    delete conn.noCheckBucket;
+  }
+
+  // Mounts named their root `bucket`; backends call it other things.
+  for (const mount of state.mounts) {
+    if (mount.root === undefined) mount.root = mount.bucket || '';
+  }
+
   state.version = CONFIG_VERSION;
 
   try {
@@ -155,67 +182,98 @@ function updateSettings(patch) {
 // A connection is an S3 account: endpoint plus credentials. Mounts reference
 // one by id so several drives can share a single set of keys.
 function publicConnection(conn) {
-  const { secret, ...rest } = conn;
-  return { ...rest, hasSecret: Boolean(secret && secret.enc) };
+  const { secrets, ...rest } = conn;
+  const names = Object.keys(secrets || {});
+  return {
+    ...rest,
+    // Never the values, only which fields hold one and whether it is readable.
+    secretFields: names,
+    hasSecret: names.length > 0 && names.every((k) => secrets[k] && secrets[k].enc),
+    needsSecret: names.length > 0,
+  };
 }
 
 function listConnections() {
   return get().connections.map(publicConnection);
 }
 
+/**
+ * A connection with its secrets decrypted, ready to hand to rclone.
+ *
+ * The result merges the stored secrets back into `config` under their rclone
+ * field names, so the caller never has to know which fields were encrypted.
+ */
 async function getConnectionSecret(id) {
   const conn = get().connections.find((c) => c.id === id);
   if (!conn) return null;
 
-  const opened = await openSecret(conn.secret);
-  if (opened.shouldReEncrypt && opened.value) {
-    try {
-      conn.secret = await sealSecret(opened.value);
-      save();
-      log.info('Clave resellada tras rotar la clave del sistema.');
-    } catch (err) {
-      log.warn('No se pudo resellar la clave:', err.message);
+  const config = { ...(conn.config || {}) };
+  let resealed = false;
+
+  for (const [field, blob] of Object.entries(conn.secrets || {})) {
+    const opened = await openSecret(blob);
+    if (opened.value) config[field] = opened.value;
+
+    // The OS key can be rotated underneath us; re-seal when it says so.
+    if (opened.shouldReEncrypt && opened.value) {
+      try {
+        conn.secrets[field] = await sealSecret(opened.value);
+        resealed = true;
+      } catch (err) {
+        log.warn(`Could not re-seal ${field}:`, err.message);
+      }
     }
   }
-  return { ...conn, secretAccessKey: opened.value };
+
+  if (resealed) {
+    try {
+      save();
+      log.info('Credentials re-sealed after the system key rotated.');
+    } catch (err) {
+      log.warn('Could not save re-sealed credentials:', err.message);
+    }
+  }
+
+  return { ...publicConnection(conn), config };
 }
 
+/**
+ * Create or update a connection.
+ *
+ * `config` holds plain values under rclone's own field names, `secrets` the
+ * ones to encrypt under those same names. Keeping rclone's vocabulary end to
+ * end means a new backend needs no change here: whatever the catalogue says
+ * its fields are called is what gets stored and what rclone later reads.
+ */
 async function saveConnection(input) {
   const conns = get().connections;
   const existing = input.id ? conns.find((c) => c.id === input.id) : null;
 
   const record = {
     id: existing ? existing.id : `conn_${crypto.randomUUID()}`,
-    name: (input.name || '').trim() || 'Conexion sin nombre',
-    endpoint: normaliseEndpoint(input.endpoint),
-    region: (input.region || 'us-east-1').trim(),
-    accessKeyId: (input.accessKeyId || '').trim(),
-    forcePathStyle: input.forcePathStyle !== false,
-    noCheckBucket: input.noCheckBucket !== false,
-    secret: existing ? existing.secret : null,
+    name: (input.name || '').trim() || 'Unnamed connection',
+    type: input.type || (existing ? existing.type : 's3'),
+    config: { ...(input.config || {}) },
+    // Field names rclone needs stored obscured rather than in clear text.
+    obscuredFields: input.obscuredFields || (existing ? existing.obscuredFields : []) || [],
+    secrets: existing ? { ...existing.secrets } : {},
     createdAt: existing ? existing.createdAt : new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
 
-  // An empty secret on an edit means "keep the stored one".
-  if (input.secretAccessKey) record.secret = await sealSecret(input.secretAccessKey);
+  // An omitted secret on an edit means "keep the stored one"; an empty string
+  // means "remove it".
+  for (const [field, value] of Object.entries(input.secrets || {})) {
+    if (value === undefined) continue;
+    if (value === '') delete record.secrets[field];
+    else record.secrets[field] = await sealSecret(value);
+  }
 
   if (existing) conns[conns.indexOf(existing)] = record;
   else conns.push(record);
 
   save();
   return publicConnection(record);
-}
-
-function deleteConnection(id) {
-  const data = get();
-  const inUse = data.mounts.filter((m) => m.connectionId === id);
-  if (inUse.length) {
-    const names = inUse.map((m) => m.name).join(', ');
-    throw new Error(`La conexion la usan ${inUse.length} unidad(es): ${names}.`);
-  }
-  data.connections = data.connections.filter((c) => c.id !== id);
-  save();
 }
 
 function normaliseEndpoint(value) {
