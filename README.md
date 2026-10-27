@@ -12,7 +12,7 @@ any disk — there is nothing to sync and nothing to upload by hand.
 
 ## Download
 
-**[Download OmniMount 1.0.0 for Windows](https://github.com/rodillo69/OmniMount/releases/latest/download/OmniMount-Setup-1.0.0.exe)** · 116 MB · Windows 10 or 11, 64-bit
+**[Download OmniMount 1.1.0 for Windows](https://github.com/rodillo69/OmniMount/releases/latest/download/OmniMount-Setup-1.1.0.exe)** · 116 MB · Windows 10 or 11, 64-bit
 
 The newest version is always on the [releases page](https://github.com/rodillo69/OmniMount/releases/latest).
 Once installed, the app updates itself.
@@ -57,6 +57,19 @@ open it:
 Nothing else is required, and neither component is bundled, so you always get
 a current version.
 
+> **Do not run OmniMount as administrator.**
+> It never needs to be, and doing it stops the drives working. Windows keeps a
+> separate list of drive letters for elevated programs, so a drive mounted by
+> an elevated OmniMount exists for OmniMount and for nothing else — Explorer
+> shows no such drive. OmniMount detects this at startup and offers to restart
+> itself normally rather than mount something you cannot open.
+
+Installing the **WinFsp** driver is the one step that genuinely needs
+administrator rights, and OmniMount asks for them on its own, once, through
+the ordinary Windows prompt. If the account cannot approve that prompt, an
+administrator has to install the driver once; every account on the computer
+can use it afterwards.
+
 ---
 
 ## Your credentials
@@ -96,6 +109,12 @@ Being honest about this matters more than a tidy feature list:
 - **S3** is tested end to end against a live service: mount, list, read,
   write, delete and unmount, plus credentials correctly rejected when used
   against the wrong server.
+- **A drive is reported as working only once it has been read back.** The
+  letter appearing is not proof: WinFsp publishes it before the filesystem
+  behind it answers, and it survives a filesystem that has died. OmniMount
+  lists the root directory before it calls a mount finished, and creating a
+  drive mounts it there and then, so "drive created" means a drive you can
+  open and not a form that saved cleanly.
 - **The other backends** share the same code path — only the settings handed
   to rclone differ — but they have not each been exercised against a real
   server. If one misbehaves, please open an issue.

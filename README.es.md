@@ -12,7 +12,7 @@ hay nada que sincronizar ni que subir a mano.
 
 ## Descarga
 
-**[Descargar OmniMount 1.0.0 para Windows](https://github.com/rodillo69/OmniMount/releases/latest/download/OmniMount-Setup-1.0.0.exe)** · 116 MB · Windows 10 u 11, 64 bits
+**[Descargar OmniMount 1.1.0 para Windows](https://github.com/rodillo69/OmniMount/releases/latest/download/OmniMount-Setup-1.1.0.exe)** · 116 MB · Windows 10 u 11, 64 bits
 
 La versión más reciente está siempre en la [página de versiones](https://github.com/rodillo69/OmniMount/releases/latest).
 Una vez instalado, el programa se actualiza solo.
@@ -59,6 +59,20 @@ lo abres:
 No hace falta nada más, y ninguno de los dos va empaquetado dentro, así que
 siempre tendrás una versión actual.
 
+> **No abras OmniMount como administrador.**
+> No le hace ninguna falta, y hacerlo rompe las unidades. Windows mantiene una
+> lista de letras de unidad aparte para los programas elevados, así que una
+> unidad montada por un OmniMount elevado existe para OmniMount y para nadie
+> más: en el Explorador no aparece. OmniMount lo detecta al arrancar y se
+> ofrece a reiniciarse de forma normal, en vez de montar algo que no vas a
+> poder abrir.
+
+Instalar el controlador **WinFsp** es el único paso que necesita permisos de
+administrador de verdad, y OmniMount los pide él solo, una vez, con el aviso
+normal de Windows. Si la cuenta no puede aceptar ese aviso, tiene que instalar
+el controlador una vez quien administre el equipo; después lo puede usar
+cualquier cuenta.
+
 ---
 
 ## Tus credenciales
@@ -97,6 +111,12 @@ Esto importa más que una lista de funciones bien presentada:
 - **S3** está probado de punta a punta contra un servicio real: montar,
   listar, leer, escribir, borrar y desmontar, además de comprobar que unas
   credenciales se rechazan correctamente contra el servidor equivocado.
+- **Una unidad no se da por buena hasta haberla leído.** Que aparezca la letra
+  no demuestra nada: WinFsp la publica antes de que responda el sistema de
+  ficheros que hay detrás, y sigue ahí cuando ese sistema se ha caído. Antes
+  de dar un montaje por terminado, OmniMount lista el directorio raíz, y al
+  crear una unidad la monta en ese momento: «unidad creada» significa una
+  unidad que puedes abrir, no un formulario que se guardó sin quejarse.
 - **Los demás backends** comparten el mismo camino de código —sólo cambian los
   ajustes que se le pasan a rclone— pero no se ha probado cada uno contra un
   servidor real. Si alguno falla, abre una incidencia.
