@@ -471,7 +471,23 @@ OM.driveForm = (() => {
         return paint();
       }
 
+      // The list on screen is built from the renderer's copy of the drives,
+      // so it has to be reloaded before the form goes away. Without this the
+      // drive mounts, Explorer shows the letter, and the panel keeps showing
+      // what it showed before until the application is restarted.
+      await app().reloadAll();
+      app().refreshChrome();
+
       modal.close();
+
+      // Re-render whatever view is on screen so the new drive is in it, and
+      // point the dashboard at the drive that was just created.
+      if (app().state.route === 'dashboard') {
+        app().navigate('dashboard', { focus: result ? result.id : undefined });
+      } else {
+        app().renderView();
+      }
+
       if (result && result.mountOk) {
         OM.toast.success(t('form.mounted', { letter: result.driveLetter }));
       } else {

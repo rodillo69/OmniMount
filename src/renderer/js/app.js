@@ -19,13 +19,19 @@
     mounts: [],
     statuses: {},
     stats: {},
+    // What the updater last reported. Read by the Settings card; the notice
+    // is driven by its own event.
+    update: { status: 'idle' },
   };
 
+  // Keys, not text. This list is built when the file loads, which happens
+  // before the language is known: resolving the labels here would freeze the
+  // whole sidebar in whichever language happened to be the default.
   const NAV = [
-    { route: 'dashboard', label: t('app.unidades'), icon: 'drive' },
-    { route: 'explorer', label: t('app.explorador'), icon: 'folder' },
-    { route: 'logs', label: t('app.registro'), icon: 'terminal' },
-    { route: 'settings', label: t('app.ajustes'), icon: 'settings' },
+    { route: 'dashboard', labelKey: 'app.unidades', icon: 'drive' },
+    { route: 'explorer', labelKey: 'app.explorador', icon: 'folder' },
+    { route: 'logs', labelKey: 'app.registro', icon: 'terminal' },
+    { route: 'settings', labelKey: 'app.ajustes', icon: 'settings' },
   ];
 
   /* ----------------------------------------------------------------- api */
@@ -129,6 +135,23 @@
     await Promise.all([loadMounts(), loadConnections(), loadDeps()]);
   }
 
+  // Reloads the drives and puts them on screen. Only the dashboard is
+  // re-rendered: redrawing the explorer would throw the user back to the root
+  // of whatever folder they were reading, and a drive appearing elsewhere is
+  // not worth that.
+  let catchingUp = false;
+  async function catchUp() {
+    if (catchingUp) return;
+    catchingUp = true;
+    try {
+      await loadMounts();
+      refreshChrome();
+      if (state.route === 'dashboard') renderView();
+    } finally {
+      catchingUp = false;
+    }
+  }
+
   /* ----------------------------------------------------------- selectores */
 
   function statusOf(mountId) {
@@ -196,7 +219,7 @@
         { type: 'button', onclick: () => navigate(item.route) },
         [
           icon(item.icon, 18, 'navitem__icon'),
-          h('span.navitem__label', item.label),
+          h('span.navitem__label', t(item.labelKey)),
           badge,
         ]
       );
@@ -233,16 +256,18 @@
     const summary = counts();
 
     let dotClass = 'dot--idle';
-    let label = 'Sin unidades montadas';
+    let label = t('status.noneMounted');
     if (summary.errored) {
       dotClass = 'dot--error';
-      label = `${summary.errored} con error`;
+      label = t('status.withError', { count: summary.errored });
     } else if (summary.busy) {
       dotClass = 'dot--busy';
-      label = 'Trabajando...';
+      label = t('status.working');
     } else if (summary.mounted) {
       dotClass = 'dot--mounted';
-      label = `${fmt.pluralise(summary.mounted, 'unidad montada', 'unidades montadas')}`;
+      label = t(summary.mounted === 1 ? 'status.oneMounted' : 'status.manyMounted', {
+        count: summary.mounted,
+      });
     }
 
     mount(node, [h(`span.dot.${dotClass}`), h('span', label)]);
@@ -276,6 +301,16 @@
       if (!status.stats) delete state.stats[status.id];
       refreshChrome();
 
+      // A drive the renderer has never heard of means its copy of the list is
+      // out of date: the drive was created in the form, or mounted from the
+      // tray, or started automatically. The views patch their cards in place
+      // and have nothing to patch for a drive that is not in the list, so
+      // without reloading here the panel stays as it was until a restart.
+      if (!state.mounts.some((m) => m.id === status.id)) {
+        catchUp();
+        return;
+      }
+
       const view = global.OM.views[state.route];
       if (view && typeof view.onMountState === 'function') view.onMountState(status);
     });
@@ -291,6 +326,18 @@
     api.mounts.onLog((payload) => {
       const view = global.OM.views[state.route];
       if (view && typeof view.onMountLog === 'function') view.onMountLog(payload);
+    });
+
+    // A version worth interrupting for. The main process has already
+    // weighed what was found against the settings, so anything that arrives
+    // here is meant to be seen.
+    api.update.onAnnounce((found) => global.OM.updateNotice.open(found));
+
+    api.update.onState((payload) => {
+      state.update = payload;
+      global.OM.updateNotice.onState(payload);
+      const view = global.OM.views[state.route];
+      if (view && typeof view.onUpdateState === 'function') view.onUpdateState(payload);
     });
 
     api.settings.onChanged((settings) => {
@@ -348,6 +395,9 @@
   async function boot() {
     state.appInfo = (await call(api.app.info(), { silent: true })) || {};
     state.settings = (await call(api.settings.get(), { silent: true })) || {};
+    // Whatever the updater already knows, so Settings opens with the real
+    // answer rather than "never checked".
+    state.update = (await call(api.update.state(), { silent: true })) || { status: 'idle' };
     // Language before anything is painted, or the first frame renders in the
     // wrong one and flickers when it corrects itself.
     OM.i18n.setLanguage(state.settings.language);
