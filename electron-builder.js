@@ -73,6 +73,10 @@ module.exports = {
     allowToChangeInstallationDirectory: true,
     // Per-user install needs no administrator rights. Only the filesystem
     // driver does, and that is requested once, on first run.
+    //
+    // build/installer.nsh forces this and hides the "for all users" page
+    // entirely, so nobody can pick the mode that elevates the installer for
+    // no benefit. See the comment there.
     perMachine: false,
     createDesktopShortcut: true,
     createStartMenuShortcut: true,
