@@ -52,8 +52,9 @@ const MOUNT = {
   // means something.
   reportedSizeTB: 0,
   cacheMode: 'full',
-  cacheMaxSizeGB: 10,
-  cacheMaxAgeHours: 24,
+  // How large the cache may get and how long it keeps a file are not per-drive
+  // settings: they belong to the disk the cache sits on, which every drive
+  // shares. They live in the cache settings instead (see `cache.js`).
   dirCacheSeconds: 30,
   transfers: 8,
   checkers: 8,

@@ -94,6 +94,26 @@
   // not block on walking the cache folder.
   let cacheState = null;
 
+  // The order the profiles are offered in: fastest first, because that is
+  // what the drive ships with, then down to the one that leaves least behind.
+  const PROFILE_ORDER = ['performance', 'balanced', 'lowfootprint', 'custom'];
+
+  // The custom editor's fields, in the order they are shown. `kind` picks the
+  // control; the label and the hint come from the catalogue.
+  const TUNING_FIELDS = [
+    { key: 'cacheMode', kind: 'mode' },
+    { key: 'retentionDays', kind: 'number' },
+    { key: 'readChunkStreams', kind: 'number' },
+    { key: 'readChunkSizeMB', kind: 'number' },
+    { key: 'readAheadMB', kind: 'number' },
+    { key: 'dirCacheSeconds', kind: 'number' },
+    { key: 'transfers', kind: 'number' },
+    { key: 'checkers', kind: 'number' },
+    { key: 'writeBackSeconds', kind: 'number' },
+    { key: 'handleCachingSeconds', kind: 'number' },
+    { key: 'fastFingerprint', kind: 'switch' },
+  ];
+
   function cacheCard() {
     const body = h('div.settings-group');
     paintCache(body);
@@ -123,6 +143,7 @@
     const fmt = global.OM.fmt;
     const volume = cacheState.volume;
     const automatic = cacheState.limitGB <= 0;
+
 
     // What it is doing right now, in one line, before any control. The
     // numbers are the point: a cache setting with no figures beside it is
@@ -190,6 +211,34 @@
         ])
       ),
 
+      // The profile. One choice instead of eleven, because the figures trade
+      // against each other and someone asked to set them one at a time has
+      // no way to know which combinations make sense together.
+      setting(
+        t('cache.profile'),
+        t('cache.profileHint.' + cacheState.profile),
+        h(
+          'select.select',
+          {
+            style: { width: '210px' },
+            onchange: (e) => setProfile(body, e.target.value),
+          },
+          PROFILE_ORDER.map((id) =>
+            h(
+              'option',
+              { value: id, selected: id === cacheState.profile },
+              t('cache.profileName.' + id)
+            )
+          )
+        )
+      ),
+
+      // What the chosen profile actually resolves to. A named profile with no
+      // figures beside it is a promise the user cannot check.
+      cacheState.profile === 'custom' ? null : tuningSummary(),
+
+      cacheState.profile === 'custom' ? customEditor(body) : null,
+
       setting(
         t('cache.used'),
         t('cache.usedHint'),
@@ -204,11 +253,11 @@
       ),
     ];
 
-    OM.dom.mount(body, rows);
+    OM.dom.mount(body, rows.filter(Boolean));
   }
 
   async function chooseLocation(body) {
-    const picked = await app().call(app().api.cache.choose(), { silent: true });
+    const picked = await app().call(app().api.cache.choose(t('cache.chooseTitle')), { silent: true });
     if (!picked || picked.cancelled) return;
     await setLocation(body, picked.path);
   }
@@ -230,6 +279,114 @@
     if (!result) return;
     cacheState.limitGB = result.limitGB;
     paintCache(body);
+  }
+
+  /** The resolved figures, read-only, beneath a named profile. */
+  function tuningSummary() {
+    const tuning = cacheState.tuning;
+    const parts = [
+      t('cache.sumMode', { mode: tuning.cacheMode }),
+      tuning.retentionDays > 0
+        ? t('cache.sumKeptDays', { days: tuning.retentionDays })
+        : t('cache.sumKeptForever'),
+      tuning.readChunkStreams > 0
+        ? t('cache.sumStreams', { streams: tuning.readChunkStreams, size: tuning.readChunkSizeMB })
+        : t('cache.sumStreamsOff', { size: tuning.readChunkSizeMB }),
+      tuning.cacheMode === 'full' && tuning.readAheadMB > 0
+        ? t('cache.sumReadAhead', { mb: tuning.readAheadMB })
+        : null,
+      t('cache.sumTransfers', { transfers: tuning.transfers }),
+      t('cache.sumListings', { seconds: tuning.dirCacheSeconds }),
+    ].filter(Boolean);
+
+    return h('div.setting__hint', parts.join(' \u00b7 '));
+  }
+
+  /** Every figure, editable, for the custom profile. */
+  function customEditor(body) {
+    const tuning = cacheState.tuning;
+    const limits = cacheState.limits || {};
+
+    return h(
+      'div.settings-group',
+      TUNING_FIELDS.map((field) => {
+        const label = t('cache.field.' + field.key);
+        const hint = t('cache.fieldHint.' + field.key);
+
+        if (field.kind === 'switch') {
+          return switchRow(label, tuning[field.key], (value) => editCustom(body, field.key, value), {
+            hint,
+          });
+        }
+
+        if (field.kind === 'mode') {
+          return setting(
+            label,
+            hint,
+            h(
+              'select.select',
+              {
+                // Wide enough for "full (reads and writes)" without clipping.
+                style: { width: '210px' },
+                onchange: (e) => editCustom(body, field.key, e.target.value),
+              },
+              ['full', 'writes'].map((mode) =>
+                h(
+                  'option',
+                  { value: mode, selected: mode === tuning[field.key] },
+                  t('cache.mode.' + mode)
+                )
+              )
+            )
+          );
+        }
+
+        const range = limits[field.key] || [0, 9999];
+        return setting(
+          label,
+          hint,
+          h('input.input', {
+            type: 'number',
+            min: String(range[0]),
+            max: String(range[1]),
+            step: '1',
+            value: tuning[field.key],
+            style: { width: '110px' },
+            onchange: (e) => editCustom(body, field.key, Number(e.target.value)),
+          })
+        );
+      })
+    );
+  }
+
+  async function setProfile(body, profile) {
+    const result = await app().call(app().api.cache.setProfile({ profile }), { silent: true });
+    if (!result) return;
+    cacheState.profile = result.id;
+    cacheState.tuning = result.tuning;
+    paintCache(body);
+    warnRemount();
+  }
+
+  async function editCustom(body, key, value) {
+    const next = { ...cacheState.tuning, [key]: value };
+    const result = await app().call(
+      app().api.cache.setProfile({ profile: 'custom', tuning: next }),
+      { silent: true }
+    );
+    if (!result) return;
+    cacheState.profile = result.id;
+    cacheState.tuning = result.tuning;
+    paintCache(body);
+    warnRemount();
+  }
+
+  // rclone is handed these figures once, when it starts, so a drive already
+  // running keeps the old ones until it is mounted again.
+  function warnRemount() {
+    if (app().state.mounts.some((m) => app().statusOf(m.id).state === 'mounted')) {
+      toast.warn(t('cache.remountNeeded'));
+    }
   }
 
   async function clearCache(body) {

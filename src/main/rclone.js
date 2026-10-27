@@ -126,17 +126,74 @@ function freePort() {
  *
  * A ceiling is still applied when the user asked for one.
  */
-function cacheModeFlags(mount, plan) {
-  const flags = ['--vfs-cache-mode', mount.cacheMode];
-  if (mount.cacheMode !== 'writes' && mount.cacheMode !== 'full') return flags;
+// What to use if no plan is supplied. The caller always builds one; this only
+// keeps a programming slip from silently handing rclone its own defaults,
+// which evict after an hour and read one chunk at a time.
+const FALLBACK_TUNING = require('./cache-profiles').BALANCED;
 
-  flags.push('--vfs-cache-max-age', `${mount.cacheMaxAgeHours}h`);
+/**
+ * Cache and read-path flags, all of them from the active profile.
+ *
+ * None of this is per-drive: the cache sits on one disk that every drive
+ * shares, and the link to the remote is the same link. A profile per drive
+ * would mean one drive's read-ahead deciding how much room the other one has.
+ */
+function tuningFlags(mount, plan) {
+  const tuning = (plan && plan.tuning) || FALLBACK_TUNING;
+  const flags = [];
+
+  // How far ahead to read, and how. With streams above zero rclone reads that
+  // many chunks at once at a constant size; at zero it reads one and doubles
+  // as it goes. Chunks are not held in memory.
+  if (tuning.readChunkStreams > 0) {
+    flags.push('--vfs-read-chunk-streams', String(tuning.readChunkStreams));
+  }
+  flags.push('--vfs-read-chunk-size', `${tuning.readChunkSizeMB}M`);
+
+  // Read-ahead only exists in `full` mode, where it is buffered on disk.
+  // `--buffer-size` is left at its default on purpose: rclone's own advice is
+  // to grow this instead, because the buffer is per open file and in memory.
+  if (tuning.cacheMode === 'full' && tuning.readAheadMB > 0) {
+    flags.push('--vfs-read-ahead', `${tuning.readAheadMB}M`);
+  }
+
+  if (tuning.fastFingerprint) flags.push('--vfs-fast-fingerprint');
+
+  flags.push(
+    '--vfs-handle-caching',
+    `${tuning.handleCachingSeconds}s`,
+    '--dir-cache-time',
+    `${tuning.dirCacheSeconds}s`,
+    // S3 cannot notify about remote changes, so polling only burns requests.
+    '--poll-interval',
+    '0',
+    '--transfers',
+    String(tuning.transfers),
+    '--checkers',
+    String(tuning.checkers)
+  );
+
+  return flags;
+}
+
+function cacheModeFlags(mount, plan) {
+  const tuning = (plan && plan.tuning) || FALLBACK_TUNING;
+  const flags = ['--vfs-cache-mode', tuning.cacheMode];
+  if (tuning.cacheMode !== 'writes' && tuning.cacheMode !== 'full') return flags;
+
+  // How long a file survives after its last use. `off` does not disable the
+  // cache: it removes the age limit, leaving eviction to the free-space
+  // reserve below. rclone parses it as a duration of ~292 years, so the
+  // cleaner's cutoff lands in the 1700s and nothing is ever too old.
+  const hours = plan ? plan.retentionHours : FALLBACK_TUNING.retentionDays * 24;
+  flags.push('--vfs-cache-max-age', hours > 0 ? `${hours}h` : 'off');
+  flags.push('--vfs-write-back', `${tuning.writeBackSeconds}s`);
 
   if (plan && plan.minFreeSpaceGB > 0) {
     flags.push('--vfs-cache-min-free-space', `${plan.minFreeSpaceGB}G`);
   }
 
-  const ceiling = plan ? plan.maxSizeGB : mount.cacheMaxSizeGB;
+  const ceiling = plan ? plan.maxSizeGB : 0;
   if (ceiling > 0) flags.push('--vfs-cache-max-size', `${ceiling}G`);
 
   // Per-mount cache directory: the remote name is shared, so without this
@@ -190,17 +247,7 @@ function buildMountArgs(mount, rc, options = {}) {
   }
 
   args.push(...cacheModeFlags(mount, cachePlan));
-  args.push(
-    '--dir-cache-time',
-    `${mount.dirCacheSeconds}s`,
-    // S3 cannot notify about remote changes, so polling only burns requests.
-    '--poll-interval',
-    '0',
-    '--transfers',
-    String(mount.transfers),
-    '--checkers',
-    String(mount.checkers)
-  );
+  args.push(...tuningFlags(mount, cachePlan));
 
   if (mount.bandwidthLimit) args.push('--bwlimit', mount.bandwidthLimit);
 

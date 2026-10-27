@@ -240,6 +240,66 @@
         'Usa el espacio que sobre y va soltando lo menos usado, dejando siempre {reserve} GB libres en el disco.',
       'cache.sizeFixedHint':
         'Nunca pasará de {limit} GB, y además dejará {reserve} GB libres en el disco.',
+      /* ------------------------------------------------------- perfiles */
+      'cache.profile': 'Perfil',
+      'cache.profileName.performance': 'Rendimiento',
+      'cache.profileName.balanced': 'Equilibrado',
+      'cache.profileName.lowfootprint': 'Mínima huella',
+      'cache.profileName.custom': 'Personalizado',
+      'cache.profileHint.performance':
+        'Recomendado. Guarda lo que abres un mes y confía en los listados cinco minutos, así que volver a algo con lo que ya has trabajado es casi instantáneo. La primera descarga la marca tu conexión, no este ajuste. A cambio deja más cosas en el disco y durante más tiempo.',
+      'cache.profileHint.balanced':
+        'Lo mismo con una semana de retención en vez de un mes. Menos huella en el disco, algún acierto de caché menos.',
+      'cache.profileHint.lowfootprint':
+        'Para un equipo compartido: lo que lees no se guarda nunca en el disco, sólo lo que escribes, y eso se suelta en un día. Volver a abrir lo mismo se paga: medido unas nueve veces más lento en una carpeta de ficheros pequeños.',
+      'cache.profileHint.custom': 'Tus propios valores. Cada campo lleva al lado lo que hace.',
+
+      'cache.mode.full': 'full (lectura y escritura)',
+      'cache.mode.writes': 'writes (sólo escritura)',
+
+      /* resumen del perfil activo */
+      'cache.sumMode': 'modo {mode}',
+      'cache.sumKeptDays': 'se guarda {days} día(s)',
+      'cache.sumKeptForever': 'se guarda hasta que haga falta el disco',
+      'cache.sumStreams': '{streams} flujos de {size} MB en paralelo',
+      'cache.sumStreamsOff': 'un flujo desde {size} MB, creciendo',
+      'cache.sumReadAhead': '{mb} MB de lectura adelantada',
+      'cache.sumTransfers': '{transfers} transferencias a la vez',
+      'cache.sumListings': 'listados válidos {seconds} s',
+
+      /* editor del perfil personalizado */
+      'cache.field.cacheMode': 'Modo de caché',
+      'cache.fieldHint.cacheMode':
+        '«full» hace que la unidad se comporte como un disco. «writes» no guarda las lecturas: menos huella, más descargas.',
+      'cache.field.retentionDays': 'Días que se guarda',
+      'cache.fieldHint.retentionDays':
+        'Desde la última vez que se usó el fichero. 0 = no se suelta por antigüedad, sólo cuando haga falta espacio.',
+      'cache.field.readChunkStreams': 'Flujos en paralelo',
+      'cache.fieldHint.readChunkStreams':
+        'Trozos que se descargan a la vez de un mismo fichero. En pruebas sobre un enlace rápido no se notó diferencia entre 0, 4 y 16; está aquí porque sí ayuda cuando la latencia es alta. 0 = uno detrás de otro.',
+      'cache.field.readChunkSizeMB': 'Tamaño de trozo (MB)',
+      'cache.fieldHint.readChunkSizeMB':
+        'Con flujos en paralelo conviene que sea pequeño; con un solo flujo empieza aquí y va doblando.',
+      'cache.field.readAheadMB': 'Lectura adelantada (MB)',
+      'cache.fieldHint.readAheadMB':
+        'Cuánto se adelanta a lo que pides, guardándolo en disco. Sólo aplica en modo «full».',
+      'cache.field.dirCacheSeconds': 'Listados válidos (s)',
+      'cache.fieldHint.dirCacheSeconds':
+        'Cuánto vale un listado de carpeta antes de volver a preguntar. Más alto es navegar más rápido y ver más tarde los cambios que haga otro.',
+      'cache.field.transfers': 'Transferencias',
+      'cache.fieldHint.transfers': 'Subidas y bajadas simultáneas.',
+      'cache.field.checkers': 'Comprobadores',
+      'cache.fieldHint.checkers': 'Comprobaciones de metadatos en paralelo.',
+      'cache.field.writeBackSeconds': 'Espera antes de subir (s)',
+      'cache.fieldHint.writeBackSeconds':
+        'Tras cerrar un fichero. Más alto agrupa varias ediciones seguidas en una sola subida.',
+      'cache.field.handleCachingSeconds': 'Mantener abierto (s)',
+      'cache.fieldHint.handleCachingSeconds':
+        'Tiempo que se conserva el fichero abierto tras cerrarlo. Si se vuelve a abrir dentro de ese rato, no hay que montar la descarga otra vez.',
+      'cache.field.fastFingerprint': 'Comprobación rápida de cambios',
+      'cache.fieldHint.fastFingerprint':
+        'Decide si la copia local sigue valiendo sin pedir el hash, que es una petición más por fichero.',
+      'cache.chooseTitle': 'Dónde guardar la caché',
       'cache.used': 'Ocupado ahora',
       'cache.usedHint': 'Borrarla no toca nada del almacenamiento remoto: se vuelve a descargar.',
       'cache.clear': 'Vaciar',
@@ -536,6 +596,66 @@
         'Uses whatever is spare and lets go of the least used, always keeping {reserve} GB free on the disk.',
       'cache.sizeFixedHint':
         'Never goes past {limit} GB, and still keeps {reserve} GB free on the disk.',
+      /* -------------------------------------------------------- profiles */
+      'cache.profile': 'Profile',
+      'cache.profileName.performance': 'Performance',
+      'cache.profileName.balanced': 'Balanced',
+      'cache.profileName.lowfootprint': 'Minimal footprint',
+      'cache.profileName.custom': 'Custom',
+      'cache.profileHint.performance':
+        'Recommended. Keeps what you open for a month and trusts listings for five minutes, so going back to something you have already worked on is near instant. The first download is set by your connection, not by this setting. In exchange it leaves more on the disk, for longer.',
+      'cache.profileHint.balanced':
+        'The same with a week of retention instead of a month. Less left on the disk, a few cache hits fewer.',
+      'cache.profileHint.lowfootprint':
+        'For a shared computer: what you read is never written to the disk, only what you save, and that goes within a day. Reopening the same files costs you: measured about nine times slower on a folder of small files.',
+      'cache.profileHint.custom': 'Your own figures. Each field says what it does.',
+
+      'cache.mode.full': 'full (reads and writes)',
+      'cache.mode.writes': 'writes (writes only)',
+
+      /* summary of the active profile */
+      'cache.sumMode': '{mode} mode',
+      'cache.sumKeptDays': 'kept {days} day(s)',
+      'cache.sumKeptForever': 'kept until the disk is needed',
+      'cache.sumStreams': '{streams} parallel streams of {size} MB',
+      'cache.sumStreamsOff': 'one stream from {size} MB, doubling',
+      'cache.sumReadAhead': '{mb} MB read ahead',
+      'cache.sumTransfers': '{transfers} transfers at once',
+      'cache.sumListings': 'listings good for {seconds}s',
+
+      /* custom profile editor */
+      'cache.field.cacheMode': 'Cache mode',
+      'cache.fieldHint.cacheMode':
+        '"full" makes the drive behave like a disk. "writes" does not keep what you read: less left behind, more downloading.',
+      'cache.field.retentionDays': 'Days it is kept',
+      'cache.fieldHint.retentionDays':
+        'Counted from the last time the file was used. 0 = never dropped for being old, only when space is needed.',
+      'cache.field.readChunkStreams': 'Parallel streams',
+      'cache.fieldHint.readChunkStreams':
+        'Chunks of the same file downloaded at once. Testing over a fast link showed no difference between 0, 4 and 16; it is here because it does help when latency is high. 0 = one after another.',
+      'cache.field.readChunkSizeMB': 'Chunk size (MB)',
+      'cache.fieldHint.readChunkSizeMB':
+        'With parallel streams this wants to be small; with a single stream it starts here and doubles.',
+      'cache.field.readAheadMB': 'Read ahead (MB)',
+      'cache.fieldHint.readAheadMB':
+        'How far ahead of what you asked for it reads, buffered on disk. Only applies in "full" mode.',
+      'cache.field.dirCacheSeconds': 'Listings good for (s)',
+      'cache.fieldHint.dirCacheSeconds':
+        'How long a folder listing is trusted before asking again. Higher means faster browsing and later notice of what someone else changed.',
+      'cache.field.transfers': 'Transfers',
+      'cache.fieldHint.transfers': 'Simultaneous uploads and downloads.',
+      'cache.field.checkers': 'Checkers',
+      'cache.fieldHint.checkers': 'Metadata checks run in parallel.',
+      'cache.field.writeBackSeconds': 'Wait before uploading (s)',
+      'cache.fieldHint.writeBackSeconds':
+        'After a file is closed. Higher gathers several edits in a row into one upload.',
+      'cache.field.handleCachingSeconds': 'Keep open for (s)',
+      'cache.fieldHint.handleCachingSeconds':
+        'How long a file is held open after it is closed. Reopening inside that window skips setting the download up again.',
+      'cache.field.fastFingerprint': 'Fast change detection',
+      'cache.fieldHint.fastFingerprint':
+        'Decides whether the local copy is still valid without asking for the hash, which is another request per file.',
+      'cache.chooseTitle': 'Where to keep the cache',
       'cache.used': 'Currently using',
       'cache.usedHint': 'Clearing it touches nothing on the remote storage: it downloads again.',
       'cache.clear': 'Clear',

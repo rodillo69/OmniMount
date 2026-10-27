@@ -127,7 +127,7 @@ class MountManager extends EventEmitter {
       const args = rclone.buildMountArgs(mount, rc, { cache: plan });
       const env = await rclone.buildEnv(connection);
 
-      if (mount.cacheMode === 'writes' || mount.cacheMode === 'full') {
+      if (plan.tuning.cacheMode === 'writes' || plan.tuning.cacheMode === 'full') {
         try {
           fs.mkdirSync(plan.dir, { recursive: true });
         } catch (err) {
@@ -138,11 +138,15 @@ class MountManager extends EventEmitter {
             `No se pudo preparar la caché en ${plan.dir}: ${err.message}. Revisa dónde se guarda la caché en Ajustes.`
           );
         }
+        const size = plan.automatic
+          ? `automática, dejando ${plan.minFreeSpaceGB} GB libres en el disco`
+          : `máximo ${plan.maxSizeGB} GB, dejando ${plan.minFreeSpaceGB} GB libres`;
+        const age = plan.retentionDays > 0
+          ? `se guarda ${plan.retentionDays} día(s)`
+          : 'se guarda hasta que haga falta el disco';
         this.appendLog(
           mountId,
-          plan.automatic
-            ? `Caché en ${plan.dir} (automática, dejando ${plan.minFreeSpaceGB} GB libres en el disco).`
-            : `Caché en ${plan.dir} (máximo ${plan.maxSizeGB} GB, dejando ${plan.minFreeSpaceGB} GB libres).`,
+          `Caché en ${plan.dir} (${size}; ${age}). Perfil: ${plan.profile}.`,
           'system'
         );
       }

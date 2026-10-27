@@ -31,9 +31,10 @@ contextBridge.exposeInMainWorld('omni', {
   cache: {
     volumes: () => invoke('cache:volumes'),
     state: () => invoke('cache:state'),
-    choose: () => invoke('cache:choose'),
+    choose: (title) => invoke('cache:choose', title),
     setLocation: (target) => invoke('cache:setLocation', target),
     setLimit: (gb) => invoke('cache:setLimit', gb),
+    setProfile: (payload) => invoke('cache:setProfile', payload),
     clear: () => invoke('cache:clear'),
   },
 

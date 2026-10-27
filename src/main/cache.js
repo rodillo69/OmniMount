@@ -20,12 +20,19 @@
  *
  * A fixed cap is still offered, because someone sharing a disk with another
  * program's data may want a hard ceiling regardless of what is free.
+ *
+ * *How it behaves*: how long a file is kept, how far ahead it reads, how many
+ * streams it opens. These are not independent dials a user can be asked to
+ * set one by one — they trade speed against how much of the remote ends up
+ * sitting on the local disk — so they arrive together as a profile. See
+ * `cache-profiles.js`.
  */
 
 const fs = require('node:fs');
 const path = require('node:path');
 const { dirs } = require('./paths');
 const volumes = require('./volumes');
+const profiles = require('./cache-profiles');
 const store = require('./store');
 const log = require('./logger').scoped('cache');
 
@@ -43,6 +50,17 @@ function reserveGB(volume) {
   if (!volume || !volume.total) return 10;
   const tenth = (volume.total / GB) * 0.1;
   return Math.round(Math.min(50, Math.max(5, tenth)));
+}
+
+/**
+ * How long a cached file is kept after the last time it was used.
+ *
+ * Seven days by default. Zero means no age limit at all: a file then stays
+ * until the disk is needed and the least recently used copies are evicted to
+ * maintain the reserve above.
+ */
+function retentionDays() {
+  return profiles.resolve(store.getSettings()).tuning.retentionDays;
 }
 
 /** The configured cache root, or the default beside the application data. */
@@ -69,6 +87,7 @@ async function plan(mountId) {
   const volume = await volumes.forPath(dir);
 
   const limitGB = Number(settings.cacheLimitGB) || 0;
+  const { id, tuning } = profiles.resolve(settings);
   return {
     dir,
     volume,
@@ -77,6 +96,11 @@ async function plan(mountId) {
     // Zero means no ceiling: the reserve governs instead.
     maxSizeGB: limitGB > 0 ? limitGB : 0,
     automatic: limitGB <= 0,
+    profile: id,
+    tuning,
+    retentionDays: tuning.retentionDays,
+    // Zero means no age limit, which rclone spells `off`.
+    retentionHours: tuning.retentionDays > 0 ? tuning.retentionDays * 24 : 0,
   };
 }
 
@@ -198,4 +222,13 @@ function remove(mountId, { force = false } = {}) {
   return { removed: true, pending };
 }
 
-module.exports = { root, dirFor, plan, usage, pendingUploads, remove, reserveGB };
+module.exports = {
+  root,
+  dirFor,
+  plan,
+  usage,
+  pendingUploads,
+  remove,
+  reserveGB,
+  retentionDays,
+};

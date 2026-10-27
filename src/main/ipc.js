@@ -11,6 +11,7 @@ const drives = require('./drives');
 const elevation = require('./elevation');
 const volumes = require('./volumes');
 const cache = require('./cache');
+const cacheProfiles = require('./cache-profiles');
 const defaults = require('./defaults');
 const rclone = require('./rclone');
 const mounts = require('./mount-manager');
@@ -412,14 +413,20 @@ function register() {
       location: settings.cacheLocation || '',
       limitGB: Number(settings.cacheLimitGB) || 0,
       reserveGB: cache.reserveGB(volume),
+      profile: cacheProfiles.resolve(settings).id,
+      tuning: cacheProfiles.resolve(settings).tuning,
+      profiles: cacheProfiles.PROFILES,
+      limits: cacheProfiles.LIMITS,
       usage: cache.usage(),
     };
   });
 
-  handle('cache:choose', async () => {
+  handle('cache:choose', async (title) => {
     const window_ = getWindow();
     const picked = await dialog.showOpenDialog(window_, {
-      title: 'Dónde guardar la caché',
+      // Supplied by the renderer: the chosen language lives there, and the
+      // main process has no translation catalogue.
+      title: String(title || '').trim() || undefined,
       properties: ['openDirectory', 'createDirectory'],
     });
     if (picked.canceled || !picked.filePaths.length) return { cancelled: true };
@@ -454,6 +461,31 @@ function register() {
     const value = Number(gb);
     store.updateSettings({ cacheLimitGB: Number.isFinite(value) && value > 0 ? value : 0 });
     return { limitGB: Number(store.getSettings().cacheLimitGB) || 0 };
+  });
+
+  /**
+   * Choose a cache profile, or edit the custom one.
+   *
+   * Switching to `custom` without supplying figures seeds it from whatever
+   * profile was in force, so the editor opens on the settings the drive is
+   * actually using rather than on a set of defaults the user never saw.
+   */
+  handle('cache:setProfile', ({ profile, tuning } = {}) => {
+    const settings = store.getSettings();
+    const wanted = cacheProfiles.PROFILE_IDS.includes(profile)
+      ? profile
+      : cacheProfiles.resolve(settings).id;
+
+    const patch = { cacheProfile: wanted };
+    if (wanted === 'custom') {
+      const seed = tuning || settings.cacheCustom;
+      const base =
+        seed && Object.keys(seed).length ? seed : cacheProfiles.resolve(settings).tuning;
+      patch.cacheCustom = cacheProfiles.sanitize(base);
+    }
+
+    store.updateSettings(patch);
+    return cacheProfiles.resolve(store.getSettings());
   });
 
   /**

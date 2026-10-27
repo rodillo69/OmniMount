@@ -6,7 +6,7 @@ const { safeStorage } = require('electron');
 const { configFile, dirs } = require('./paths');
 const log = require('./logger').scoped('store');
 
-const CONFIG_VERSION = 4;
+const CONFIG_VERSION = 5;
 
 const DEFAULTS = {
   version: CONFIG_VERSION,
@@ -28,6 +28,13 @@ const DEFAULTS = {
     // Zero lets the cache use what is spare, held back only by the free
     // space rclone is told to maintain. A number is a hard ceiling in GB.
     cacheLimitGB: 0,
+    // How the cache and the read path behave: 'performance', 'balanced',
+    // 'lowfootprint' or 'custom'. See `cache-profiles.js` for the figures
+    // each one resolves to and why.
+    cacheProfile: 'performance',
+    // Only read when the profile is 'custom'. Empty means "start from the
+    // balanced figures", which is what the interface seeds the editor with.
+    cacheCustom: {},
   },
   connections: [],
   mounts: [],
@@ -163,6 +170,23 @@ function migrate() {
   if (state.version < 4) {
     for (const mount of state.mounts) {
       if (mount.reportedSizeTB === 1) mount.reportedSizeTB = 0;
+    }
+  }
+
+  // v5 moves the cache and read-path tuning out of each mount and into a
+  // profile, because these are properties of the disk the cache sits on and
+  // of the link to the remote — both shared by every drive. None of these
+  // fields was ever shown in the interface, so nothing is being overridden by
+  // deleting them: they would just sit in the file looking authoritative
+  // while nothing read them.
+  if (state.version < 5) {
+    for (const mount of state.mounts) {
+      delete mount.cacheMaxSizeGB;
+      delete mount.cacheMaxAgeHours;
+      delete mount.cacheMode;
+      delete mount.dirCacheSeconds;
+      delete mount.transfers;
+      delete mount.checkers;
     }
   }
 
@@ -369,16 +393,11 @@ function saveMount(input) {
     // Explorador que luego aparece con una cruz roja aunque la unidad ya no
     // exista, y ensucia "Este equipo" hasta que se borra del registro.
     networkMode: input.networkMode === true,
-    cacheMode: ['off', 'minimal', 'writes', 'full'].includes(input.cacheMode)
-      ? input.cacheMode
-      : 'full',
-    cacheMaxSizeGB: clampNumber(input.cacheMaxSizeGB, 1, 2048, 10),
-    cacheMaxAgeHours: clampNumber(input.cacheMaxAgeHours, 1, 8760, 24),
-    dirCacheSeconds: clampNumber(input.dirCacheSeconds, 1, 86400, 30),
-    transfers: clampNumber(input.transfers, 1, 64, 8),
-    checkers: clampNumber(input.checkers, 1, 64, 8),
     bandwidthLimit: (input.bandwidthLimit || '').trim(),
-    reportedSizeTB: clampNumber(input.reportedSizeTB, 0, 1024, 1),
+    // Zero, not 1: an unstated capacity means "say nothing". Defaulting to
+    // 1 TB here would quietly reintroduce the figure Explorer enforces, and
+    // that v4 exists to clear.
+    reportedSizeTB: clampNumber(input.reportedSizeTB, 0, 1024, 0),
     autoMount: Boolean(input.autoMount),
     autoRestart: input.autoRestart !== false,
     extraFlags: (input.extraFlags || '').trim(),
