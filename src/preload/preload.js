@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('omni', {
     openPath: (target) => invoke('app:openPath', target),
     openExternal: (url) => invoke('app:openExternal', url),
     revealLog: () => invoke('app:revealLog'),
+    relaunchUnelevated: () => invoke('app:relaunchUnelevated'),
   },
 
   deps: {

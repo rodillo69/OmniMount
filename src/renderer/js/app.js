@@ -35,6 +35,14 @@
    * failure raises a toast and returns null, so call sites stay flat; pass
    * {throwOnError:true} where the caller needs to react.
    */
+  // Failures the main process raises with a code have a translated text here.
+  // Everything else falls back to the message it sent.
+  const CODE_TEXT = {
+    ELEVATED: 'elevation.mountBlocked',
+    NEEDS_ADMIN: 'setup.necesitaAdministrador',
+    UAC_DECLINED: 'setup.permisoRechazado',
+  };
+
   async function call(promise, options) {
     const opts = options || {};
     let result;
@@ -47,7 +55,8 @@
       return null;
     }
     if (!result || result.ok !== true) {
-      const message = (result && result.error) || 'Error desconocido.';
+      const key = result && result.code ? CODE_TEXT[result.code] : null;
+      const message = (key && t(key)) || (result && result.error) || t('app.unknownError');
       if (!opts.silent) toast.error(message);
       if (opts.throwOnError) throw new Error(message);
       return null;
@@ -303,16 +312,17 @@
     global.OM.setup.show();
 
     try {
-      await call(api.deps.ensure(), { silent: true, throwOnError: true });
+      const result = await call(api.deps.ensure(), { silent: true, throwOnError: true });
       await loadDeps();
 
-      if (!state.deps || !state.deps.ready) {
-        throw new Error(
-          'Los componentes se instalaron pero Windows todavía no los detecta. Reinicia el equipo y vuelve a abrir OmniMount.'
-        );
+      // A driver that installed but is not loaded yet is not a failure to
+      // retry: it is a restart. Saying "ready" here would send the user
+      // straight into a mount that cannot work.
+      if ((result && result.needsReboot) || !state.deps || !state.deps.ready) {
+        throw new Error(t('setup.reinicioPendiente'));
       }
 
-      global.OM.setup.succeed('Todo listo.');
+      global.OM.setup.succeed(t('setup.listo'));
       setTimeout(() => global.OM.setup.hide(), 850);
       return true;
     } catch (err) {
@@ -328,6 +338,18 @@
     // wrong one and flickers when it corrects itself.
     OM.i18n.setLanguage(state.settings.language);
     applyTheme(state.settings.theme);
+
+    // Elevated, with no linked connections: nothing this app mounts would
+    // show up in the user's Explorer. Stop here rather than let someone
+    // configure a drive that cannot work.
+    const privileges = state.appInfo.elevation;
+    if (privileges && privileges.elevated && !privileges.linkedConnections) {
+      global.OM.elevation.show(async () => {
+        const done = await call(api.app.relaunchUnelevated(), { silent: true });
+        return done === true;
+      });
+      return;
+    }
 
     // Las escuchas se ponen ANTES de pedir los datos: si se montara algo
     // entre la lectura y el enganche, ese aviso se perdería y la unidad se

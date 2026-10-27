@@ -76,4 +76,104 @@ function isLetterPresent(letter) {
   }
 }
 
-module.exports = { ALL_LETTERS, usedLetters, freeLetters, suggestLetter, isLetterPresent };
+/**
+ * Whether a letter is not merely defined but actually serves files.
+ *
+ * existsSync is not enough to call a mount finished. A drive letter is a
+ * symlink in the DOS device table, and the symlink appears the moment WinFsp
+ * publishes it — before the filesystem behind it is answering, and it stays
+ * there if that filesystem dies. Both cases look identical to existsSync, and
+ * both are what "it says it mounted but there is nothing there" looks like
+ * from the outside.
+ *
+ * Reading the root directory is the cheapest question only a live filesystem
+ * can answer, so that is the test.
+ */
+function isLetterServing(letter) {
+  const root = `${String(letter).toUpperCase()}:\\`;
+  try {
+    fs.readdirSync(root);
+    return true;
+  } catch (err) {
+    // A directory that exists but refuses to be read is a mount that is up and
+    // simply empty of permissions, not a broken one.
+    return err && err.code === 'EACCES';
+  }
+}
+
+// SHChangeNotify, called with the event ids the shell uses for a drive
+// appearing (SHCNE_DRIVEADD) and going away (SHCNE_DRIVEREMOVED), with
+// SHCNF_PATH | SHCNF_FLUSH. There is no Electron or Node API for it, and the
+// C# is compiled on demand, which costs about half a second — paid once per
+// mount, which is the right place to pay it.
+//
+// The drive letter is written into the script rather than passed as an
+// argument because `powershell -Command <text> a b` appends the extra tokens
+// to the command text instead of filling $args, which runs them as commands
+// of their own. The letter is a single validated character, so there is
+// nothing to inject.
+function notifyScript(letter, added) {
+  return `
+$source = @'
+using System;
+using System.Runtime.InteropServices;
+public static class OmniMountShell {
+  [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+  private static extern void SHChangeNotify(int eventId, uint flags, IntPtr item1, IntPtr item2);
+  public static void Drive(string root, bool added) {
+    IntPtr p = Marshal.StringToHGlobalUni(root);
+    try { SHChangeNotify(added ? 0x00000100 : 0x00000080, 0x0005, p, IntPtr.Zero); }
+    finally { Marshal.FreeHGlobal(p); }
+  }
+}
+'@
+Add-Type -TypeDefinition $source -Language CSharp
+[OmniMountShell]::Drive('${letter}:\\', $${added ? 'true' : 'false'})
+`;
+}
+
+/**
+ * Tell the shell a drive has come or gone.
+ *
+ * WinFsp creates the letter with DefineDosDevice, which does not announce
+ * itself to the shell. A newly opened Explorer window enumerates the letters
+ * and finds it, but a window that was already open keeps the list it built
+ * when it opened — so the drive is there, works, and is missing from "This PC"
+ * until something forces a refresh. This is that something.
+ *
+ * Never throws and is never awaited for correctness: the mount is already
+ * valid, this only decides whether the user has to press F5.
+ */
+function notifyShell(letter, added) {
+  const normalised = String(letter || '').toUpperCase();
+  if (!/^[A-Z]$/.test(normalised)) return Promise.resolve(false);
+
+  return new Promise((resolve) => {
+    execFile(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        notifyScript(normalised, added),
+      ],
+      { timeout: 20000, windowsHide: true },
+      (err) => {
+        if (err) log.warn(`No se pudo avisar al Explorador de ${normalised}:`, err.message);
+        resolve(!err);
+      }
+    );
+  });
+}
+
+module.exports = {
+  ALL_LETTERS,
+  usedLetters,
+  freeLetters,
+  suggestLetter,
+  isLetterPresent,
+  isLetterServing,
+  notifyShell,
+};

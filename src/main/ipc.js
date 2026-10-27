@@ -8,6 +8,7 @@ const backends = require('./backends');
 const remoteFs = require('./remote-fs');
 const updater = require('./updater');
 const drives = require('./drives');
+const elevation = require('./elevation');
 const defaults = require('./defaults');
 const rclone = require('./rclone');
 const mounts = require('./mount-manager');
@@ -53,7 +54,10 @@ function handle(channel, fn) {
       return { ok: true, data: await fn(...args) };
     } catch (err) {
       log.error(`${channel}:`, err.message);
-      return { ok: false, error: err.message || String(err) };
+      // `code` travels alongside the message so the interface can show the
+      // translated text for the failures it knows, instead of the Spanish
+      // string this process happened to build.
+      return { ok: false, error: err.message || String(err), code: err.code || null };
     }
   });
 }
@@ -146,7 +150,20 @@ function register() {
     cacheDir: dirs.cache,
     encryptionAvailable: await store.encryptionAvailable(),
     rcloneVersion: await rclone.version(),
+    // Read before the first screen is painted: if the app is elevated, no
+    // drive it mounts will be visible to the user, and there is no point
+    // letting them configure one first.
+    elevation: await elevation.read(),
   }));
+
+  handle('app:relaunchUnelevated', async () => {
+    await elevation.relaunchUnelevated();
+    // Nothing is mounted at this point, so there is nothing to flush. The
+    // delay only gives Explorer time to pick the request up before this
+    // process, and the single-instance lock with it, goes away.
+    setTimeout(() => app.exit(0), 700);
+    return true;
+  });
 
   handle('app:openPath', async (target) => {
     const result = await shell.openPath(target);
@@ -329,7 +346,26 @@ function register() {
     }
     applyLoginItem();
 
-    return saved;
+    // Mount it here, and report what actually happened.
+    //
+    // Reading the remote is not the same as mounting it: the credentials can
+    // be perfect and the drive still never appear, because the driver is not
+    // loaded or because Windows will not show a letter this process created.
+    // Saying "drive created" on the strength of the credentials alone is how
+    // someone ends up with a drive the app calls valid and Explorer does not
+    // have. So the answer carries the mount result, and the caller decides
+    // what to tell the user.
+    let mountOk = false;
+    let mountError = null;
+    try {
+      await mounts.mount(saved.id);
+      mountOk = true;
+    } catch (err) {
+      mountError = err.message;
+      log.warn(`La unidad ${saved.id} se guardó pero no se pudo montar:`, err.message);
+    }
+
+    return { ...saved, mountOk, mountError };
   });
 
   /**

@@ -568,6 +568,18 @@
   margin-bottom: var(--sp-8);
 }
 
+/* The lockup carries its own colour for the light interface, which on this
+   dark panel left the mark and "Omni" invisible against the background. The
+   rail variant is not reused because it disappears at narrow widths, where
+   the sidebar collapses to icons and this panel does not. */
+.setup__logo .lockup {
+  color: #fff;
+}
+
+.setup__logo .lockup__name span {
+  color: rgba(248, 250, 252, 0.55);
+}
+
 .setup__kicker {
   font-size: var(--fs-xs);
   font-weight: 650;

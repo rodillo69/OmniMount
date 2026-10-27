@@ -8,6 +8,7 @@ const https = require('node:https');
 const { app } = require('electron');
 const { execFile } = require('node:child_process');
 const { dirs, rcloneExe } = require('./paths');
+const elevation = require('./elevation');
 const log = require('./logger').scoped('deps');
 
 // Los dos componentes viajan dentro del instalador, así que el primer arranque
@@ -18,10 +19,13 @@ const WINFSP_FALLBACK = {
   url: 'https://github.com/winfsp/winfsp/releases/download/v2.1/winfsp-2.1.25156.msi',
 };
 const RCLONE_URL = 'https://downloads.rclone.org/rclone-current-windows-amd64.zip';
-const WINFSP_DLL_CANDIDATES = [
-  'C:\\Program Files (x86)\\WinFsp\\bin\\winfsp-x64.dll',
-  'C:\\Program Files\\WinFsp\\bin\\winfsp-x64.dll',
+const WINFSP_BIN_CANDIDATES = [
+  'C:\\Program Files (x86)\\WinFsp\\bin',
+  'C:\\Program Files\\WinFsp\\bin',
 ];
+const WINFSP_DLL_CANDIDATES = WINFSP_BIN_CANDIDATES.map((dir) =>
+  path.join(dir, 'winfsp-x64.dll')
+);
 
 /** Carpeta con los binarios empaquetados, dentro o fuera del .exe instalado. */
 function vendorDir() {
@@ -52,14 +56,38 @@ function registryQuery(key, value) {
   });
 }
 
-async function checkWinFsp() {
-  const dll = WINFSP_DLL_CANDIDATES.find((candidate) => {
-    try {
-      return fs.existsSync(candidate);
-    } catch {
-      return false;
-    }
+function existsQuietly(candidate) {
+  try {
+    return fs.existsSync(candidate);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Ask the driver itself whether it is loaded.
+ *
+ * Files on disk and a registry key only prove that an installer ran. The
+ * kernel driver is a separate thing, registered under a side-by-side name
+ * that carries a build timestamp (WinFsp+20261023T124309Z on this machine), so
+ * there is no fixed service name to query. `fsptool lsvol` asks the driver to
+ * list its volumes, which it can only answer if it is actually loaded, and
+ * needs no privileges to do it.
+ *
+ * This is the difference between "WinFsp is installed" and "mounting will
+ * work" — and it is the gap a freshly installed driver awaiting a reboot falls
+ * into.
+ */
+function driverResponds(fsptool) {
+  return new Promise((resolve) => {
+    execFile(fsptool, ['lsvol'], { timeout: 10000, windowsHide: true }, (err) =>
+      resolve(!err)
+    );
   });
+}
+
+async function checkWinFsp() {
+  const dll = WINFSP_DLL_CANDIDATES.find(existsQuietly);
 
   const version =
     (await registryQuery('HKLM\\SOFTWARE\\WOW6432Node\\WinFsp', 'Version')) ||
@@ -69,15 +97,27 @@ async function checkWinFsp() {
     (await registryQuery('HKLM\\SOFTWARE\\WinFsp', 'InstallDir'));
 
   const installed = Boolean(dll) || Boolean(version) || Boolean(installDir);
+
+  const fsptool = [
+    ...(installDir ? [path.join(installDir, 'bin', 'fsptool-x64.exe')] : []),
+    ...WINFSP_BIN_CANDIDATES.map((dir) => path.join(dir, 'fsptool-x64.exe')),
+  ].find(existsQuietly);
+
+  // With no way to ask, the files are the best evidence available. Reporting
+  // "not ready" on a missing tool would block a working machine over a
+  // question we simply could not put.
+  const ready = installed && (fsptool ? await driverResponds(fsptool) : true);
+
   return {
     id: 'winfsp',
     name: 'Controlador de unidad',
     technicalName: 'WinFsp',
     installed,
+    ready,
     version: version || (installed ? 'instalado' : null),
     path: dll || installDir || null,
     requiresAdmin: true,
-    description: 'Permite que el bucket aparezca como una unidad real en el Explorador.',
+    description: 'Permite que el almacenamiento aparezca como una unidad real en el Explorador.',
   };
 }
 
@@ -110,7 +150,10 @@ async function checkRclone() {
 
 async function checkAll() {
   const [winfsp, rclone] = await Promise.all([checkWinFsp(), checkRclone()]);
-  return { winfsp, rclone, ready: winfsp.installed && rclone.installed };
+  // `ready` gates mounting, so it follows the driver actually answering rather
+  // than its files being present. The two differ exactly when a reboot is
+  // still pending, which is when mounting would fail.
+  return { winfsp, rclone, ready: winfsp.ready && rclone.installed };
 }
 
 /* ------------------------------------------------------------ descargas */
@@ -329,27 +372,48 @@ async function installWinFsp(onProgress) {
   // Start-Process -Verb RunAs sí lo pide, y -Wait permite leer el resultado.
   const code = await runElevatedMsi(msi);
 
-  if (temporary) fs.rmSync(msi, { force: true });
+  // El MSI sólo se borra si la instalación salió bien. Si falló, es lo único
+  // que un administrador necesita para arreglarlo a mano, y borrarlo obligaría
+  // a descargarlo otra vez desde una sesión que quizá no tiene red.
+  const cleanUp = () => {
+    if (temporary) fs.rmSync(msi, { force: true });
+  };
 
   if (code === 'declined' || code === 1602) {
+    const state = await elevation.read();
     const err = new Error(
-      'No se autorizó la instalación del controlador. Hay que aceptar el aviso de Windows para poder crear unidades.'
+      state.canElevate
+        ? 'No se autorizó la instalación del controlador. Hay que aceptar el aviso de Windows para poder crear unidades.'
+        : 'Esta cuenta no puede instalar el controlador: Windows pide credenciales de administrador. Tiene que instalarlo una vez quien administre el equipo.'
     );
     err.userDeclined = true;
+    err.code = state.canElevate ? 'UAC_DECLINED' : 'NEEDS_ADMIN';
+    err.installerPath = msi;
     throw err;
   }
   if (code !== 0 && code !== 3010) {
-    throw new Error(`El instalador del controlador terminó con el código ${code}.`);
+    const err = new Error(`El instalador del controlador terminó con el código ${code}.`);
+    err.installerPath = msi;
+    throw err;
   }
 
   const status = await checkWinFsp();
   if (!status.installed) {
-    throw new Error('El controlador dice haberse instalado pero no se detecta. Reinicia el equipo.');
+    const err = new Error(
+      'El controlador dice haberse instalado pero no se detecta. Reinicia el equipo.'
+    );
+    err.installerPath = msi;
+    throw err;
   }
 
-  log.info('WinFsp instalado, version', status.version);
-  report('done', { message: 'Controlador listo.', percent: 100, needsReboot: code === 3010 });
-  return { ...status, needsReboot: code === 3010 };
+  cleanUp();
+
+  // Instalado pero sin responder: el driver se carga al reiniciar. Montar
+  // ahora fallaría, así que se dice aquí y no después, con la unidad a medias.
+  const needsReboot = code === 3010 || !status.ready;
+  log.info('WinFsp instalado, version', status.version, needsReboot ? '(pendiente de reinicio)' : '');
+  report('done', { message: 'Controlador listo.', percent: 100, needsReboot });
+  return { ...status, needsReboot };
 }
 
 /**
@@ -370,7 +434,11 @@ async function ensureAll(onProgress) {
 
   const pending = [];
   if (!status.rclone.installed) pending.push('rclone');
+  // Un controlador ya instalado que no responde no se arregla reinstalándolo:
+  // le falta el reinicio que carga el driver. Volver a pasar el MSI sólo
+  // gastaría otro aviso de UAC para acabar igual.
   if (!status.winfsp.installed) pending.push('winfsp');
+  else if (!status.winfsp.ready) needsReboot = true;
 
   let index = 0;
   for (const id of pending) {

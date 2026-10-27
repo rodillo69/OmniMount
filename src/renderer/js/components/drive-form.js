@@ -46,6 +46,9 @@ OM.driveForm = (() => {
       readOnly: editing ? editing.readOnly : false,
       autoMount: editing ? editing.autoMount : true,
       connectionId: editing ? editing.connectionId : null,
+      // Set once a drive has been saved but not mounted, so a retry edits it
+      // instead of creating a duplicate.
+      savedId: null,
       reuseConnection: false,
       showAdvanced: false,
       search: '',
@@ -401,7 +404,10 @@ OM.driveForm = (() => {
       try {
         result = await app().call(
           app().api.setup.createDrive({
-            id: editing ? editing.id : undefined,
+            // state.savedId carries a drive that was saved but failed to
+            // mount: without it, correcting a field and submitting again
+            // would leave the broken drive behind and create a second one.
+            id: editing ? editing.id : state.savedId || undefined,
             type: state.type,
             config: state.reuseConnection ? {} : state.values,
             connectionId: state.reuseConnection ? state.connectionId : null,
@@ -421,8 +427,28 @@ OM.driveForm = (() => {
       }
 
       state.busy = false;
+
+      // The drive is only finished when it is mounted. Credentials that read
+      // correctly are not the same thing: the driver may not be loaded, or
+      // Windows may refuse to publish the letter. Closing with "drive
+      // created" on the strength of the credentials alone would be telling
+      // the user something nobody has checked.
+      if (result && result.mountOk === false) {
+        state.savedId = result.id;
+        state.error = t('form.savedNotMounted', { error: result.mountError });
+        // The dashboard shows the saved drive in its error state, so the
+        // failure is visible there too and not only in this form.
+        await app().reloadAll();
+        app().refreshChrome();
+        return paint();
+      }
+
       modal.close();
-      OM.toast.success(editing ? t('form.updated') : t('form.created'));
+      if (result && result.mountOk) {
+        OM.toast.success(t('form.mounted', { letter: result.driveLetter }));
+      } else {
+        OM.toast.success(editing ? t('form.updated') : t('form.created'));
+      }
       if (opts.onDone) opts.onDone(result);
     }
 

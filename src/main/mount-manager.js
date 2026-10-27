@@ -6,6 +6,7 @@ const { rcloneExe, mountCacheDir } = require('./paths');
 const rclone = require('./rclone');
 const drives = require('./drives');
 const deps = require('./deps');
+const elevation = require('./elevation');
 const store = require('./store');
 const log = require('./logger').scoped('mounts');
 
@@ -126,9 +127,14 @@ class MountManager extends EventEmitter {
         fs.mkdirSync(mountCacheDir(mount.id), { recursive: true });
       }
 
+      // `root` is the generic name for the bucket, container, share or folder;
+      // `bucket` is only the older field kept for drives saved before the
+      // rename. Reading bucket first printed "undefined" for anything that
+      // has no bucket, which is most backends.
+      const target = [mount.root || mount.bucket, mount.prefix].filter(Boolean).join('/');
       this.appendLog(
         mountId,
-        `Montando ${mount.bucket}${mount.prefix ? `/${mount.prefix}` : ''} en ${mount.driveLetter}: ...`,
+        `Montando ${target || '/'} en ${mount.driveLetter}: ...`,
         'system'
       );
       // Las credenciales de S3 no aparecen aquí porque viajan en el entorno,
@@ -149,6 +155,12 @@ class MountManager extends EventEmitter {
       run.restartAttempts = 0;
       this.setState(mountId, 'mounted', { error: null });
       this.appendLog(mountId, `Unidad ${mount.driveLetter}: disponible.`, 'system');
+
+      // An Explorer window that was already open does not notice a letter
+      // created with DefineDosDevice. Not awaited: the drive is usable either
+      // way, this only saves the user pressing F5.
+      drives.notifyShell(mount.driveLetter, true);
+
       this.ensureStatsLoop();
       return this.status(mountId);
     } catch (err) {
@@ -161,9 +173,27 @@ class MountManager extends EventEmitter {
   }
 
   async preflight(mount) {
+    // Running elevated is checked first because it is the one problem that
+    // does not announce itself: everything downstream would succeed and the
+    // drive would still be missing from the user's Explorer. Better to refuse
+    // than to mount into a letter only this process can see.
+    const privileges = await elevation.read();
+    if (!elevation.mountsAreVisible(privileges)) {
+      const error = new Error(
+        'OmniMount se está ejecutando como administrador. Windows no muestra en el Explorador las unidades que crea un programa elevado, así que la unidad se montaría sin que puedas abrirla. Cierra OmniMount y ábrelo con un doble clic normal.'
+      );
+      error.code = 'ELEVATED';
+      throw error;
+    }
+
     const status = await deps.checkAll();
     if (!status.winfsp.installed) {
       throw new Error('Falta el controlador de unidad. Instálalo desde Ajustes > Componentes.');
+    }
+    if (!status.winfsp.ready) {
+      throw new Error(
+        'El controlador de unidad está instalado pero Windows todavía no lo ha cargado. Reinicia el equipo y vuelve a intentarlo.'
+      );
     }
     if (!status.rclone.installed) {
       throw new Error('Falta el motor de transferencia. Instálalo desde Ajustes > Componentes.');
@@ -216,14 +246,23 @@ class MountManager extends EventEmitter {
   }
 
   /**
-   * A mount is only real once Windows can resolve the drive letter. We race
-   * that against the process dying, so a bad bucket or credential surfaces as
-   * an error instead of a timeout.
+   * A mount is only real once Windows can actually read the drive.
+   *
+   * The letter appearing is not enough, and treating it as enough is what
+   * makes an app claim a mount that is not there. WinFsp publishes the letter
+   * before the filesystem behind it answers, and the letter survives a
+   * filesystem that has died, so the two states that matter — working, and
+   * looking like it works — are indistinguishable from the letter alone. The
+   * root directory has to be listed; only a live mount can do that.
+   *
+   * The wait races the process dying, so a wrong bucket or a bad credential
+   * surfaces as the error rclone reported instead of as a timeout.
    */
   waitForDrive(mountId, mount, child) {
     return new Promise((resolve, reject) => {
       const started = Date.now();
       let settled = false;
+      let letterSeen = false;
 
       const finish = (err) => {
         if (settled) return;
@@ -245,11 +284,20 @@ class MountManager extends EventEmitter {
       child.once('exit', onEarlyExit);
 
       const timer = setInterval(() => {
-        if (drives.isLetterPresent(mount.driveLetter)) return finish(null);
+        if (drives.isLetterPresent(mount.driveLetter)) {
+          letterSeen = true;
+          if (drives.isLetterServing(mount.driveLetter)) return finish(null);
+        }
+
         if (Date.now() - started > MOUNT_TIMEOUT_MS) {
+          // The two timeouts are different failures and deserve different
+          // words: no letter means rclone never got that far, a letter that
+          // will not list means the remote is not answering behind it.
           finish(
             new Error(
-              `La unidad ${mount.driveLetter}: no aparecio en ${MOUNT_TIMEOUT_MS / 1000} s. Revisa el registro de la unidad.`
+              letterSeen
+                ? `La unidad ${mount.driveLetter}: se creó pero no responde al leerla. Revisa el registro de la unidad.`
+                : `La unidad ${mount.driveLetter}: no apareció en ${MOUNT_TIMEOUT_MS / 1000} s. Revisa el registro de la unidad.`
             )
           );
         }
@@ -290,6 +338,9 @@ class MountManager extends EventEmitter {
     this.setState(mountId, 'unmounted', { error: null, stats: null, pid: null, mountedAt: null });
     if (!quiet && mount) {
       this.appendLog(mountId, `Unidad ${mount.driveLetter}: desmontada.`, 'system');
+      // Sin este aviso el Explorador sigue pintando la unidad hasta que algo
+      // más le haga refrescar, y al pulsarla da un error de dispositivo.
+      drives.notifyShell(mount.driveLetter, false);
     }
     this.ensureStatsLoop();
     return this.status(mountId);

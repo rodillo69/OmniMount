@@ -21,6 +21,7 @@
       'app.logs': 'Registro',
       'app.settings': 'Ajustes',
       'app.remoteStorage': 'Almacenamiento remoto',
+      'app.unknownError': 'Error desconocido.',
       'action.cancel': 'Cancelar',
       'action.save': 'Guardar',
       'action.create': 'Crear unidad',
@@ -79,6 +80,8 @@
       'form.rootHintPath': 'Déjalo vacío para empezar en la raíz.',
       'form.created': 'Unidad creada.',
       'form.updated': 'Unidad actualizada.',
+      'form.mounted': 'Unidad {letter}: lista y disponible en el Explorador.',
+      'form.savedNotMounted': 'La unidad quedó guardada, pero no se pudo montar: {error}',
       'form.failed': 'No se pudo crear la unidad.',
       'form.noTypes': 'No se pudo leer la lista de tipos de almacenamiento desde rclone.',
 
@@ -187,6 +190,27 @@
       'setup.reintentar': 'Reintentar',
       'setup.motorDeTransferencia': 'Motor de transferencia',
       'setup.controladorDeUnidad': 'Controlador de unidad',
+      'setup.reinicioPendiente':
+        'El controlador quedó instalado, pero Windows lo carga al reiniciar. Reinicia el equipo y vuelve a abrir OmniMount.',
+      'setup.necesitaAdministrador':
+        'El controlador de unidad lo tiene que instalar una vez quien administre este equipo: Windows pide credenciales de administrador y esta cuenta no las tiene.',
+      'setup.permisoRechazado':
+        'Hay que aceptar el aviso de Windows para instalar el controlador de unidad. Sin él no se pueden crear unidades.',
+
+      /* --------------------------------------- ejecución como administrador */
+      'elevation.kicker': 'Permisos de Windows',
+      'elevation.title': 'No abras OmniMount como administrador',
+      'elevation.body':
+        'Windows oculta al Explorador las unidades que crea un programa elevado. Las unidades se montarían y OmniMount las vería, pero en «Este equipo» no aparecería ninguna. Ciérralo y ábrelo con un doble clic normal.',
+      'elevation.why':
+        'OmniMount no necesita permisos de administrador. El único componente que los pide es el controlador de unidad, y lo pide él solo la primera vez.',
+      'elevation.restart': 'Reiniciar como usuario normal',
+      'elevation.restarting': 'Reiniciando…',
+      'elevation.quit': 'Salir',
+      'elevation.failed':
+        'No se pudo reiniciar automáticamente. Cierra OmniMount y vuelve a abrirlo con un doble clic normal, sin «Ejecutar como administrador».',
+      'elevation.mountBlocked':
+        'OmniMount se está ejecutando como administrador y Windows no mostraría la unidad en el Explorador. Ciérralo y ábrelo con un doble clic normal.',
 
       /* --------------------------------- nombres propios de los backends */
       'form.otherValue': 'Otro…',
@@ -228,6 +252,7 @@
       'app.logs': 'Log',
       'app.settings': 'Settings',
       'app.remoteStorage': 'Remote storage',
+      'app.unknownError': 'Unknown error.',
       'action.cancel': 'Cancel',
       'action.save': 'Save',
       'action.create': 'Create drive',
@@ -282,6 +307,8 @@
       'form.rootHintPath': 'Leave empty to start at the top level.',
       'form.created': 'Drive created.',
       'form.updated': 'Drive updated.',
+      'form.mounted': 'Drive {letter}: is ready and showing in Explorer.',
+      'form.savedNotMounted': 'The drive was saved, but it could not be mounted: {error}',
       'form.failed': 'The drive could not be created.',
       'form.noTypes': 'The list of storage types could not be read from rclone.',
 
@@ -388,6 +415,26 @@
       'setup.reintentar': 'Try again',
       'setup.motorDeTransferencia': 'Transfer engine',
       'setup.controladorDeUnidad': 'Drive driver',
+      'setup.reinicioPendiente':
+        'The driver is installed, but Windows only loads it after a restart. Restart the computer and open OmniMount again.',
+      'setup.necesitaAdministrador':
+        'The drive driver has to be installed once by whoever administers this computer: Windows asks for administrator credentials and this account does not have them.',
+      'setup.permisoRechazado':
+        'The Windows prompt has to be accepted to install the drive driver. Without it no drives can be created.',
+
+      'elevation.kicker': 'Windows permissions',
+      'elevation.title': 'Do not open OmniMount as administrator',
+      'elevation.body':
+        'Windows hides drives created by an elevated program from Explorer. The drives would mount and OmniMount would see them, but "This PC" would show nothing. Close it and open it with an ordinary double click.',
+      'elevation.why':
+        'OmniMount does not need administrator rights. The only component that does is the drive driver, and it asks for them on its own the first time.',
+      'elevation.restart': 'Restart as a normal user',
+      'elevation.restarting': 'Restarting…',
+      'elevation.quit': 'Quit',
+      'elevation.failed':
+        'Could not restart automatically. Close OmniMount and open it again with an ordinary double click, not "Run as administrator".',
+      'elevation.mountBlocked':
+        'OmniMount is running as administrator and Windows would not show the drive in Explorer. Close it and open it with an ordinary double click.',
 
       'form.otherValue': 'Other…',
       'form.provider': 'Provider',
