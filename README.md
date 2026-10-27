@@ -12,7 +12,7 @@ any disk — there is nothing to sync and nothing to upload by hand.
 
 ## Download
 
-**[Download OmniMount 1.2.0 for Windows](https://github.com/rodillo69/OmniMount/releases/latest/download/OmniMount-Setup-1.2.0.exe)** · 116 MB · Windows 10 or 11, 64-bit
+**[Download OmniMount 1.3.0 for Windows](https://github.com/rodillo69/OmniMount/releases/latest/download/OmniMount-Setup-1.3.0.exe)** · 116 MB · Windows 10 or 11, 64-bit
 
 The newest version is always on the [releases page](https://github.com/rodillo69/OmniMount/releases/latest).
 Once installed, the app updates itself.
@@ -109,6 +109,12 @@ Being honest about this matters more than a tidy feature list:
 - **S3** is tested end to end against a live service: mount, list, read,
   write, delete and unmount, plus credentials correctly rejected when used
   against the wrong server.
+- **The cache adapts to the disk instead of guessing a number.** rclone is
+  told to keep an amount of the disk free — a tenth of it, between 5 and
+  50 GB — and it evicts the least recently used files to maintain that. The
+  cache uses what is spare and retreats when the disk is needed. It can live
+  on another disk, which is what a small system drive usually wants, and a
+  fixed ceiling is there for anyone who prefers one.
 - **The capacity Windows shows is not invented.** Object storage does not
   report a quota, so by default OmniMount claims nothing and Windows shows a
   very large figure. If you know your quota you can state it per drive, under
