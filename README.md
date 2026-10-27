@@ -12,7 +12,7 @@ any disk — there is nothing to sync and nothing to upload by hand.
 
 ## Download
 
-**[Download OmniMount 1.1.0 for Windows](https://github.com/rodillo69/OmniMount/releases/latest/download/OmniMount-Setup-1.1.0.exe)** · 116 MB · Windows 10 or 11, 64-bit
+**[Download OmniMount 1.2.0 for Windows](https://github.com/rodillo69/OmniMount/releases/latest/download/OmniMount-Setup-1.2.0.exe)** · 116 MB · Windows 10 or 11, 64-bit
 
 The newest version is always on the [releases page](https://github.com/rodillo69/OmniMount/releases/latest).
 Once installed, the app updates itself.
@@ -109,6 +109,13 @@ Being honest about this matters more than a tidy feature list:
 - **S3** is tested end to end against a live service: mount, list, read,
   write, delete and unmount, plus credentials correctly rejected when used
   against the wrong server.
+- **The capacity Windows shows is not invented.** Object storage does not
+  report a quota, so by default OmniMount claims nothing and Windows shows a
+  very large figure. If you know your quota you can state it per drive, under
+  the advanced options. Stating one smaller than the real quota is the one
+  thing to avoid: Explorer checks it before a copy and refuses one that does
+  not fit, so a 1 TB claim on a 25 TB bucket turns away work that would
+  have succeeded.
 - **A drive is reported as working only once it has been read back.** The
   letter appearing is not proof: WinFsp publishes it before the filesystem
   behind it answers, and it survives a filesystem that has died. OmniMount

@@ -12,7 +12,7 @@ hay nada que sincronizar ni que subir a mano.
 
 ## Descarga
 
-**[Descargar OmniMount 1.1.0 para Windows](https://github.com/rodillo69/OmniMount/releases/latest/download/OmniMount-Setup-1.1.0.exe)** · 116 MB · Windows 10 u 11, 64 bits
+**[Descargar OmniMount 1.2.0 para Windows](https://github.com/rodillo69/OmniMount/releases/latest/download/OmniMount-Setup-1.2.0.exe)** · 116 MB · Windows 10 u 11, 64 bits
 
 La versión más reciente está siempre en la [página de versiones](https://github.com/rodillo69/OmniMount/releases/latest).
 Una vez instalado, el programa se actualiza solo.
@@ -111,6 +111,13 @@ Esto importa más que una lista de funciones bien presentada:
 - **S3** está probado de punta a punta contra un servicio real: montar,
   listar, leer, escribir, borrar y desmontar, además de comprobar que unas
   credenciales se rechazan correctamente contra el servidor equivocado.
+- **La capacidad que muestra Windows no se la inventa el programa.** El
+  almacenamiento de objetos no informa de su cupo, así que por defecto
+  OmniMount no afirma ninguno y Windows enseña una cifra muy grande. Si
+  conoces el tuyo puedes indicarlo por unidad, en las opciones avanzadas. Lo
+  único que conviene evitar es poner uno menor que el real: el Explorador lo
+  consulta antes de copiar y rechaza lo que no le quepa, así que declarar
+  1 TB sobre un bucket de 25 TB tumba copias que habrían funcionado.
 - **Una unidad no se da por buena hasta haberla leído.** Que aparezca la letra
   no demuestra nada: WinFsp la publica antes de que responda el sistema de
   ficheros que hay detrás, y sigue ahí cuando ese sistema se ha caído. Antes
