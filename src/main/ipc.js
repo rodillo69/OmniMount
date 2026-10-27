@@ -518,7 +518,22 @@ function register() {
 
   updater.register(send);
   handle('update:state', () => updater.getState());
-  handle('update:check', () => updater.check());
+  handle('update:check', () => updater.check({ manual: true }));
+  // Dismissals. 'skip' is for this version only; 'later' quiets every
+  // version for a few hours. Both answer with the settings so the interface
+  // does not have to ask for them again.
+  // Both write settings, so both announce the change: the interface keeps
+  // its own copy and would otherwise show a stale switch.
+  handle('update:skip', (input) => {
+    const next = updater.skip(input && input.version);
+    send('settings:changed', next);
+    return next;
+  });
+  handle('update:later', () => {
+    const next = updater.snooze();
+    send('settings:changed', next);
+    return next;
+  });
   handle('update:download', () => updater.download());
   handle('update:install', () => updater.installNow());
 

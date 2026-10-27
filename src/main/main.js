@@ -181,9 +181,22 @@ app.whenReady().then(async () => {
     quitting = true;
   };
 
+  // A new version that nobody is looking at is no use: with the application
+  // started with Windows and minimised, which is the normal arrangement once
+  // there is a drive, the notice would be drawn inside a hidden window. So
+  // the window is brought up for it. A notice the user asked not to see
+  // never gets here, because the main process decides that before sending.
+  updater.onAnnounce = () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (!mainWindow.isVisible() || mainWindow.isMinimized()) showWindow();
+  };
+
   // Deferred: the window has to be listening before the first update:state
   // event is sent, or the result is simply lost.
-  setTimeout(() => updater.check(), 8000);
+  setTimeout(() => {
+    updater.check();
+    updater.startSchedule();
+  }, 8000);
 
   if (settings.mountOnStart) {
     const auto = store.listMounts().filter((m) => m.autoMount);

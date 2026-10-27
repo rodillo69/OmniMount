@@ -1301,3 +1301,24 @@
   flex-direction: column;
   gap: var(--sp-2);
 }
+
+/* ------------------------------------------------- aviso de actualización */
+
+/* Release notes arrive as a list of points; they read as one if they are not
+   spaced apart. */
+.update__notes {
+  margin: 0;
+  padding-left: var(--sp-5);
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.update__notes li {
+  line-height: 1.45;
+}
+
+.update__progress {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}

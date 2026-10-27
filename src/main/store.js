@@ -6,7 +6,7 @@ const { safeStorage } = require('electron');
 const { configFile, dirs } = require('./paths');
 const log = require('./logger').scoped('store');
 
-const CONFIG_VERSION = 5;
+const CONFIG_VERSION = 6;
 
 const DEFAULTS = {
   version: CONFIG_VERSION,
@@ -35,6 +35,16 @@ const DEFAULTS = {
     // Only read when the profile is 'custom'. Empty means "start from the
     // balanced figures", which is what the interface seeds the editor with.
     cacheCustom: {},
+    // Whether a new version announces itself. Turning this off does not stop
+    // the checks, only the notice: the version found is still shown in
+    // Settings, and the update can still be installed from there.
+    updateNotify: true,
+    // A version the user asked not to be told about again. Only that one: a
+    // later release is a different answer and gets to ask.
+    updateSkipVersion: '',
+    // While this is in the future, the notice stays quiet. This is what
+    // "remind me later" writes.
+    updateSnoozedUntil: 0,
   },
   connections: [],
   mounts: [],

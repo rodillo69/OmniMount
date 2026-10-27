@@ -70,7 +70,12 @@ contextBridge.exposeInMainWorld('omni', {
     check: () => invoke('update:check'),
     download: () => invoke('update:download'),
     install: () => invoke('update:install'),
+    skip: (version) => invoke('update:skip', { version }),
+    later: () => invoke('update:later'),
     onState: (cb) => subscribe('update:state', cb),
+    // Fires only when a version should actually interrupt: the main process
+    // has already weighed the settings against what was found.
+    onAnnounce: (cb) => subscribe('update:announce', cb),
   },
 
   backends: {
