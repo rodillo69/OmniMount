@@ -45,6 +45,7 @@ OM.driveForm = (() => {
       driveLetter: editing ? editing.driveLetter : '',
       readOnly: editing ? editing.readOnly : false,
       autoMount: editing ? editing.autoMount : true,
+      reportedSizeTB: editing ? editing.reportedSizeTB || 0 : 0,
       connectionId: editing ? editing.connectionId : null,
       // Set once a drive has been saved but not mounted, so a retry edits it
       // instead of creating a duplicate.
@@ -358,20 +359,46 @@ OM.driveForm = (() => {
         )
       );
 
-      // Advanced options exist for every backend and are genuinely advanced,
-      // so they stay folded away.
+      // Advanced options are genuinely advanced, so they stay folded away:
+      // the ordinary path is still the keys and the bucket, nothing else.
       // Count only what actually applies to the chosen provider, or the
       // disclosure promises options that are not there when opened.
       const provider = state.values.provider || '';
       const adv = fields.advanced(b).filter((f) => fields.appliesTo(f, provider));
-      if (adv.length) {
-        rows.push(
-          h('details.moreopts', [
-            h('summary', t('form.moreOptions', { count: adv.length })),
-            h('div.moreopts__body', fields.render(b, state.values, setValue, { advanced: true })),
-          ])
-        );
-      }
+
+      // The capacity Explorer shows. Object storage does not answer the
+      // question, so rclone says 1 PB and Windows prints an absurd figure.
+      // Someone who knows their quota can put it here and get a number that
+      // means something; left empty, nothing is claimed — which is better
+      // than claiming something too small, since Explorer refuses a copy
+      // that does not fit in what it was told.
+      const capacity = field(
+        t('form.reportedSize'),
+        h('input.input', {
+          type: 'number',
+          min: '0',
+          step: '1',
+          value: state.reportedSizeTB || '',
+          placeholder: t('form.reportedSizePlaceholder'),
+          oninput: (e) => {
+            const value = Number(e.target.value);
+            state.reportedSizeTB = Number.isFinite(value) && value > 0 ? value : 0;
+          },
+        }),
+        { hint: t('form.reportedSizeHint') }
+      );
+
+      rows.push(
+        h('details.moreopts', [
+          h('summary', t('form.moreOptions', { count: adv.length + 1 })),
+          h('div.moreopts__body', [
+            capacity,
+            ...(adv.length
+              ? [fields.render(b, state.values, setValue, { advanced: true })]
+              : []),
+          ]),
+        ])
+      );
 
       return h('div.driveform__fields', rows);
     }
@@ -417,6 +444,7 @@ OM.driveForm = (() => {
             driveLetter: state.driveLetter,
             readOnly: state.readOnly,
             autoMount: state.autoMount,
+            reportedSizeTB: state.reportedSizeTB,
           }),
           { silent: true, throwOnError: true }
         );

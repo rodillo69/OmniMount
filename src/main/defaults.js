@@ -37,10 +37,20 @@ const MOUNT = {
   // suffix that cannot be removed, and leaves stale entries behind when the
   // drive goes away. As an ordinary drive it shows just the label.
   networkMode: false,
-  // Remote storage has no fixed quota, and rclone reports 1 PB by default,
-  // which Explorer renders as "1024 TB free" and looks like a fault. A
-  // plausible figure reads better and limits nothing a normal copy would hit.
-  reportedSizeTB: 1,
+  // What Explorer shows as the drive's capacity, in TB. Zero means "say
+  // nothing", and rclone then reports what the remote claims — 1 PB for an
+  // S3 service, which does not answer the question at all.
+  //
+  // This used to default to 1 TB, because 1024 TB free looks like a fault.
+  // That was the wrong trade: the figure is not decoration, Windows acts on
+  // it. Explorer checks it before starting a copy and refuses one that does
+  // not fit, so a drive on a 25 TB bucket would turn away a 2 TB folder with
+  // "not enough space". An invented figure smaller than the real quota
+  // breaks real work; an implausible one is only ugly.
+  //
+  // Anyone who knows their quota can set it per drive and get a figure that
+  // means something.
+  reportedSizeTB: 0,
   cacheMode: 'full',
   cacheMaxSizeGB: 10,
   cacheMaxAgeHours: 24,

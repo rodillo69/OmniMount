@@ -79,6 +79,10 @@
       'form.rootHintContainer': 'Tal y como se llama en el servidor.',
       'form.rootHintPath': 'Déjalo vacío para empezar en la raíz.',
       'form.created': 'Unidad creada.',
+      'form.reportedSize': 'Capacidad que muestra Windows (TB)',
+      'form.reportedSizePlaceholder': 'Sin indicar',
+      'form.reportedSizeHint':
+        'El almacenamiento de objetos no informa de su cupo, así que Windows muestra una cifra enorme. Si conoces el tuyo, ponlo aquí y el Explorador lo mostrará. Déjalo vacío si no estás seguro: una cifra menor que la real hace que Windows rechace copias que sí cabrían.',
       'form.updated': 'Unidad actualizada.',
       'form.mounted': 'Unidad {letter}: lista y disponible en el Explorador.',
       'form.savedNotMounted': 'La unidad quedó guardada, pero no se pudo montar: {error}',
@@ -306,6 +310,10 @@
       'form.rootHintContainer': 'Exactly as it is named on the server.',
       'form.rootHintPath': 'Leave empty to start at the top level.',
       'form.created': 'Drive created.',
+      'form.reportedSize': 'Capacity shown by Windows (TB)',
+      'form.reportedSizePlaceholder': 'Not stated',
+      'form.reportedSizeHint':
+        'Object storage does not report its quota, so Windows shows an enormous figure. If you know yours, put it here and Explorer will show it. Leave it empty if you are not sure: a figure smaller than the real quota makes Windows refuse copies that would in fact fit.',
       'form.updated': 'Drive updated.',
       'form.mounted': 'Drive {letter}: is ready and showing in Explorer.',
       'form.savedNotMounted': 'The drive was saved, but it could not be mounted: {error}',

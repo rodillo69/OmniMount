@@ -6,7 +6,7 @@ const { safeStorage } = require('electron');
 const { configFile, dirs } = require('./paths');
 const log = require('./logger').scoped('store');
 
-const CONFIG_VERSION = 3;
+const CONFIG_VERSION = 4;
 
 const DEFAULTS = {
   version: CONFIG_VERSION,
@@ -103,18 +103,23 @@ function load() {
 function migrate() {
   if (state.version >= CONFIG_VERSION) return;
 
-  for (const mount of state.mounts) {
-    mount.networkMode = false;
-    if (mount.reportedSizeTB === undefined) mount.reportedSizeTB = 1;
-  }
+  // Cada bloque lleva su versión. Sin eso, una migración nueva vuelve a
+  // aplicar las viejas, y ésas encienden ajustes que el usuario pudo haber
+  // apagado a conciencia desde entonces.
+  if (state.version < 3) {
+    for (const mount of state.mounts) {
+      mount.networkMode = false;
+      if (mount.reportedSizeTB === undefined) mount.reportedSizeTB = 1;
+    }
 
-  // La persistencia tras reiniciar llega en esta versión: quien ya tuviera
-  // unidades las quiere de vuelta al encender, no tener que ir a buscarlas.
-  if (state.mounts.length) {
-    state.settings.autostart = true;
-    state.settings.startMinimized = true;
-    state.settings.mountOnStart = true;
-    for (const mount of state.mounts) mount.autoMount = true;
+    // La persistencia tras reiniciar llega en esta versión: quien ya tuviera
+    // unidades las quiere de vuelta al encender, no tener que ir a buscarlas.
+    if (state.mounts.length) {
+      state.settings.autostart = true;
+      state.settings.startMinimized = true;
+      state.settings.mountOnStart = true;
+      for (const mount of state.mounts) mount.autoMount = true;
+    }
   }
 
   // v3 generalises a connection from "an S3 account" to "any rclone backend".
@@ -142,6 +147,17 @@ function migrate() {
   // Mounts named their root `bucket`; backends call it other things.
   for (const mount of state.mounts) {
     if (mount.root === undefined) mount.root = mount.bucket || '';
+  }
+
+  // v4 stops inventing a 1 TB capacity. Nobody ever chose that number — it
+  // was forced on every drive and never shown in the interface — and Windows
+  // treats it as real, refusing a copy that does not fit in it. Clearing it
+  // is not overriding a decision, because there was no decision to make.
+  // Anything other than that old default was set deliberately and is kept.
+  if (state.version < 4) {
+    for (const mount of state.mounts) {
+      if (mount.reportedSizeTB === 1) mount.reportedSizeTB = 0;
+    }
   }
 
   state.version = CONFIG_VERSION;

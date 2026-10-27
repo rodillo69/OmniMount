@@ -349,6 +349,9 @@ function register() {
       readOnly: Boolean(data.readOnly),
       autoMount: data.autoMount !== false,
       ...defaults.MOUNT,
+      // After the defaults, so a capacity the user typed is not overwritten
+      // by the default of claiming nothing.
+      reportedSizeTB: Number(data.reportedSizeTB) > 0 ? Number(data.reportedSizeTB) : 0,
     });
 
     // Para que la unidad sobreviva a un reinicio hace falta que la aplicación
