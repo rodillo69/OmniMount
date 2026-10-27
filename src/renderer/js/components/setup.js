@@ -8,8 +8,9 @@
   const fmt = global.OM.fmt;
 
   const STEPS = [
-    { id: 'rclone', label: t('setup.motorDeTransferencia') },
-    { id: 'winfsp', label: t('setup.controladorDeUnidad') },
+    // Keys: this runs at load, before the language is applied.
+    { id: 'rclone', labelKey: 'setup.motorDeTransferencia' },
+    { id: 'winfsp', labelKey: 'setup.controladorDeUnidad' },
   ];
 
   let overlay = null;
@@ -59,7 +60,7 @@
             'div.setup__step-mark',
             done ? icon('check', 14) : active ? h('span.setup__spinner') : h('span.setup__pending')
           ),
-          h('div.setup__step-label', step.label),
+          h('div.setup__step-label', t(step.labelKey)),
           done ? h('span.setup__step-state', t('setup.listo')) : null,
         ]);
       })
@@ -168,5 +169,15 @@
   }
 
   global.OM = global.OM || {};
-  global.OM.setup = { show, hide, onProgress, succeed, fail, reset };
+  /**
+   * Is the first-run screen covering the window?
+   *
+   * The update notice asks, because a dialog drawn underneath this overlay
+   * is a dialog nobody can answer.
+   */
+  function isShowing() {
+    return Boolean(overlay) && overlay.style.display !== 'none';
+  }
+
+  global.OM.setup = { show, hide, onProgress, succeed, fail, reset, isShowing };
 })(window);

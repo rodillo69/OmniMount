@@ -8,9 +8,10 @@
   const modal = global.OM.modal;
 
   const THEMES = [
-    { key: 'system', label: t('settings.sistema') },
-    { key: 'light', label: t('settings.claro') },
-    { key: 'dark', label: t('settings.oscuro') },
+    // Keys: this runs at load, before the language is applied.
+    { key: 'system', labelKey: 'settings.sistema' },
+    { key: 'light', labelKey: 'settings.claro' },
+    { key: 'dark', labelKey: 'settings.oscuro' },
   ];
 
   function app() {
@@ -41,7 +42,7 @@
                 h(
                   `button.segmented__item${settings.theme === theme.key ? '.is-active' : ''}`,
                   { type: 'button', onclick: () => update({ theme: theme.key }) },
-                  theme.label
+                  t(theme.labelKey)
                 )
               )
             )
@@ -81,11 +82,119 @@
 
         keysCard(),
         cacheCard(),
+        updatesCard(settings, info),
         componentsCard(),
         maintenanceCard(info),
         aboutCard(info),
       ]),
     ]);
+  }
+
+  /* ---------------------------------------------------------- updates */
+
+  // Repainted in place from the update:state events, so a download started
+  // from the notice shows its progress here too.
+  let updatesBody = null;
+
+  function updatesCard(settings, info) {
+    updatesBody = h('div.settings-group', updateRows(settings, info));
+    return h('div.card', [
+      h('div.card__head', [
+        h('div', [
+          h('div.card__title', t('settings.updates')),
+          h('div.card__desc', t('settings.updatesHint')),
+        ]),
+      ]),
+      h('div.card__body', updatesBody),
+    ]);
+  }
+
+  function updateRows(settings, info) {
+    const state = app().state.update || { status: 'idle' };
+
+    return [
+      setting(t('settings.updateStatus'), statusHint(state, info), checkControl(state)),
+      switchRow(
+        t('settings.updateNotify'),
+        settings.updateNotify !== false,
+        (v) => update({ updateNotify: v }),
+        { hint: t('settings.updateNotifyHint') }
+      ),
+      // Only worth showing when there is one, and then it needs a way back:
+      // a version dismissed for good is otherwise unreachable.
+      settings.updateSkipVersion
+        ? setting(
+            t('settings.updateSkipped'),
+            t('settings.updateSkippedHint', { version: settings.updateSkipVersion }),
+            h(
+              'button.btn.btn--ghost.btn--sm',
+              { type: 'button', onclick: () => update({ updateSkipVersion: '' }) },
+              t('settings.updateUnskip')
+            )
+          )
+        : null,
+    ].filter(Boolean);
+  }
+
+  function statusHint(state, info) {
+    const current = (info && info.version) || '—';
+    switch (state.status) {
+      case 'checking':
+        return t('update.checking');
+      case 'available':
+        return t('update.foundVersion', { version: state.info ? state.info.version : '' });
+      case 'downloading':
+        return t('update.progressPlain', {
+          percent: Math.round((state.progress && state.progress.percent) || 0),
+        });
+      case 'ready':
+        return t('update.readyToInstall', { version: state.info ? state.info.version : '' });
+      case 'installing':
+        return t('update.installing');
+      case 'current':
+        return t('update.upToDate', { version: current });
+      case 'error':
+        return t('update.failed');
+      case 'disabled':
+        // Running from source, where there is no installer to replace.
+        return t('update.notPackaged');
+      default:
+        return t('update.neverChecked', { version: current });
+    }
+  }
+
+  function checkControl(state) {
+    if (state.status === 'ready') {
+      return h(
+        'button.btn.btn--primary.btn--sm',
+        { type: 'button', onclick: () => app().call(app().api.update.install(), { silent: true }) },
+        [icon('power', 14, 'btn__icon'), h('span', t('update.restartAndInstall'))]
+      );
+    }
+    if (state.status === 'available') {
+      return h(
+        'button.btn.btn--primary.btn--sm',
+        { type: 'button', onclick: () => app().call(app().api.update.download(), { silent: true }) },
+        [icon('download', 14, 'btn__icon'), h('span', t('update.updateNow'))]
+      );
+    }
+    const busy = state.status === 'checking' || state.status === 'downloading';
+    return h(
+      'button.btn.btn--outline.btn--sm',
+      {
+        type: 'button',
+        disabled: busy ? '' : undefined,
+        onclick: (e) =>
+          withBusy(e.currentTarget, () => app().call(app().api.update.check(), { silent: true })),
+      },
+      [icon('refresh', 14, 'btn__icon'), h('span', t('update.checkNow'))]
+    );
+  }
+
+  /** Called by the application when an update:state event arrives. */
+  function onUpdateState() {
+    if (!updatesBody || !updatesBody.isConnected) return;
+    OM.dom.mount(updatesBody, updateRows(app().state.settings, app().state.appInfo));
   }
 
   /* ------------------------------------------------------------ cache */
@@ -567,11 +676,11 @@
                 deps
                   ? [
                       deps.rclone.installed
-                        ? `Motor ${deps.rclone.version}`
+                        ? t('settings.engineVersion', { version: deps.rclone.version })
                         : t('settings.engineMissing'),
                       ' · ',
                       deps.winfsp.installed
-                        ? `Controlador ${deps.winfsp.version}`
+                        ? t('settings.driverVersion', { version: deps.winfsp.version })
                         : t('settings.driverMissing'),
                     ]
                   : t('settings.checking')
@@ -746,5 +855,5 @@
 
   global.OM = global.OM || {};
   global.OM.views = global.OM.views || {};
-  global.OM.views.settings = { render };
+  global.OM.views.settings = { render, onUpdateState };
 })(window);

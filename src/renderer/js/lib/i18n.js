@@ -285,6 +285,54 @@
       'setup.failed': 'No se pudo completar la preparación.',
 
       /* ---------------------------------------------------------- cache */
+      /* ----------------------------------------------- actualizaciones */
+      'update.availableTitle': 'Hay una versión nueva',
+      'update.availableDesc':
+        'OmniMount {version} ya está disponible. Al instalarla se desmontan las unidades y la aplicación se reinicia sola.',
+      'update.dontShowAgain': 'No volver a mostrar',
+      'update.dontShowAgainHint':
+        'No se volverá a avisar de la {version}. De una versión posterior sí.',
+      'update.later': 'Más tarde',
+      'update.updateNow': 'Actualizar ahora',
+      'update.restartAndInstall': 'Reiniciar e instalar',
+      'update.downloading': 'Descargando la actualización…',
+      'update.installing': 'Instalando. La aplicación se reiniciará.',
+      'update.progress': '{percent}% · {done} de {total} · {speed}',
+      'update.progressPlain': 'Descargando… {percent}%',
+      'update.failed': 'No se pudo completar la actualización.',
+      'update.close': 'Cerrar',
+      'update.checking': 'Comprobando si hay una versión nueva…',
+      'update.checkNow': 'Comprobar ahora',
+      'update.foundVersion': 'Disponible la versión {version}.',
+      'update.readyToInstall': 'La versión {version} está descargada y lista.',
+      'update.upToDate': 'Estás en la última versión ({version}).',
+      'update.neverChecked': 'Versión {version}. Se comprueba al abrir y cada hora.',
+      'update.notPackaged': 'Ejecutándose desde el código: no hay nada que actualizar.',
+
+      'settings.updates': 'Actualizaciones',
+      'settings.updatesHint':
+        'Se comprueba al abrir la aplicación y una vez por hora. Nada se instala sin que lo pidas.',
+      'settings.updateStatus': 'Estado',
+      'settings.updateNotify': 'Avisarme de las versiones nuevas',
+      'settings.updateNotifyHint':
+        'Si lo apagas se sigue comprobando, pero sin avisos: la versión encontrada aparece aquí.',
+      'settings.updateSkipped': 'Versión descartada',
+      'settings.updateSkippedHint': 'Dijiste que no querías volver a ver el aviso de la {version}.',
+      'settings.updateUnskip': 'Volver a avisar',
+
+      /* ------------------------------------------- estado de la ventana */
+      'status.noneMounted': 'Sin unidades montadas',
+      'status.oneMounted': '{count} unidad montada',
+      'status.manyMounted': '{count} unidades montadas',
+      'status.withError': '{count} con error',
+      'status.working': 'Trabajando…',
+      'explorer.subtitle':
+        'Navega por el almacenamiento sin montar la unidad. Las operaciones van directas al servidor remoto.',
+      'logs.subtitle':
+        'La salida de rclone para cada unidad. Es el primer sitio donde mirar cuando un montaje falla.',
+      'settings.engineVersion': 'Motor {version}',
+      'settings.driverVersion': 'Controlador {version}',
+
       'cache.title': 'Caché local',
       'cache.description':
         'Los ficheros que se abren o se escriben pasan por el disco. Es lo que hace que la unidad se comporte como un disco y no como una carpeta de red.',
@@ -700,6 +748,54 @@
       'setup.uacNotice':
         'Windows will ask for administrator permission to install the driver. It is needed to create drives.',
       'setup.failed': 'Setting up could not be completed.',
+
+      /* --------------------------------------------------------- updates */
+      'update.availableTitle': 'A new version is available',
+      'update.availableDesc':
+        'OmniMount {version} is out. Installing it unmounts your drives and restarts the application by itself.',
+      'update.dontShowAgain': 'Do not show again',
+      'update.dontShowAgainHint':
+        'You will not be told about {version} again. A later version still asks.',
+      'update.later': 'Later',
+      'update.updateNow': 'Update now',
+      'update.restartAndInstall': 'Restart and install',
+      'update.downloading': 'Downloading the update…',
+      'update.installing': 'Installing. The application will restart.',
+      'update.progress': '{percent}% · {done} of {total} · {speed}',
+      'update.progressPlain': 'Downloading… {percent}%',
+      'update.failed': 'The update could not be completed.',
+      'update.close': 'Close',
+      'update.checking': 'Checking for a new version…',
+      'update.checkNow': 'Check now',
+      'update.foundVersion': 'Version {version} is available.',
+      'update.readyToInstall': 'Version {version} is downloaded and ready.',
+      'update.upToDate': 'You are on the latest version ({version}).',
+      'update.neverChecked': 'Version {version}. Checked when the app opens and once an hour.',
+      'update.notPackaged': 'Running from source: there is nothing to update.',
+
+      'settings.updates': 'Updates',
+      'settings.updatesHint':
+        'Checked when the application opens and once an hour. Nothing installs unless you ask for it.',
+      'settings.updateStatus': 'Status',
+      'settings.updateNotify': 'Tell me about new versions',
+      'settings.updateNotifyHint':
+        'Switched off, the checks carry on without the notice: whatever is found still shows here.',
+      'settings.updateSkipped': 'Dismissed version',
+      'settings.updateSkippedHint': 'You asked not to see the notice for {version} again.',
+      'settings.updateUnskip': 'Notify me again',
+
+      /* ------------------------------------------------- titlebar status */
+      'status.noneMounted': 'No drives mounted',
+      'status.oneMounted': '{count} drive mounted',
+      'status.manyMounted': '{count} drives mounted',
+      'status.withError': '{count} with an error',
+      'status.working': 'Working…',
+      'explorer.subtitle':
+        'Browse the storage without mounting a drive. Everything here goes straight to the remote server.',
+      'logs.subtitle':
+        "rclone's own output for each drive. The first place to look when a mount fails.",
+      'settings.engineVersion': 'Engine {version}',
+      'settings.driverVersion': 'Driver {version}',
 
       'cache.title': 'Local cache',
       'cache.description':

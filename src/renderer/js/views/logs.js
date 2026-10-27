@@ -13,9 +13,10 @@
   let entries = [];
 
   const FILTERS = [
-    { key: 'all', label: t('logs.todo') },
-    { key: 'problems', label: t('logs.avisosYErrores') },
-    { key: 'system', label: t('logs.actividad') },
+    // Keys: this runs at load, before the language is applied.
+    { key: 'all', labelKey: 'logs.todo' },
+    { key: 'problems', labelKey: 'logs.avisosYErrores' },
+    { key: 'system', labelKey: 'logs.actividad' },
   ];
 
   function app() {
@@ -53,7 +54,7 @@
         h('h1.view__title', t('logs.registro')),
         h(
           'p.view__sub',
-          'La salida de rclone para cada unidad. Es el primer sitio donde mirar cuando un montaje falla.'
+          t('logs.subtitle')
         ),
       ]),
       mounts.length
@@ -106,7 +107,7 @@
                 app().renderView();
               },
             },
-            f.label
+            t(f.labelKey)
           )
         )
       ),

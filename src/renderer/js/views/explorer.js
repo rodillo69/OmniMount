@@ -97,7 +97,7 @@
         h('h1.view__title', t('explorer.explorador')),
         h(
           'p.view__sub',
-          'Navega por el almacenamiento sin montar la unidad. Las operaciones van directas al servidor remoto.'
+          t('explorer.subtitle')
         ),
       ]),
       mounts.length
