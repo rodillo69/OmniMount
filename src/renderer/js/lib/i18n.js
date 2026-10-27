@@ -224,6 +224,66 @@
       'settings.appLogHint': 'Para enviar a soporte si algo falla.',
       'settings.dpapi': 'DPAPI de Windows',
       'settings.cacheFolderHint': 'Los ficheros que se han abierto o escrito. Se limpia sola.',
+      /* --------------------------------- errores del proceso principal */
+      'err.winfspMissing':
+        'Falta el controlador de unidad. Instálalo desde Ajustes → Componentes.',
+      'err.rcloneMissing':
+        'Falta el motor de transferencia. Instálalo desde Ajustes → Componentes.',
+      'err.dpapiUnavailable':
+        'El cifrado de Windows no está disponible, así que no se puede guardar la clave de forma segura.',
+      'err.cacheNetwork':
+        'Esa es una unidad de red: cada byte cacheado volvería a viajar por el cable. Elige un disco local.',
+      'err.cacheOptical': 'Esa es una unidad óptica. Elige un disco local.',
+      'err.cacheRemovable':
+        'Esa es una unidad extraíble y no siempre estará conectada. Elige un disco fijo.',
+      'err.cacheFilesystem':
+        'Ese disco no admite ficheros dispersos (FAT o exFAT), y la caché iría a rastras. Elige un disco NTFS.',
+      'err.cacheOwnMount':
+        'Esa letra la sirve OmniMount: la caché se estaría escribiendo dentro de la unidad a la que alimenta.',
+      'err.cacheNotWritable': 'No se puede escribir en esa carpeta.',
+      'err.cacheUnreadable': 'No se pudo leer el tamaño de ese disco.',
+      'err.cacheUnknown': 'No se reconoce ese disco.',
+
+      /* ------------------------------------------ barrido de traduccion */
+      'drives.noneConfigured': 'Todavía no hay ninguna unidad configurada.',
+      'drives.statCache': 'Caché local',
+      'drives.statMoved': '{bytes} movidos',
+      'drives.automatic': 'Automática',
+      'drives.refreshDirCache': 'Vaciar caché de directorios',
+      'drives.mountedTitle': 'Montada',
+      'drives.mountedBody': 'La unidad {letter}: está disponible.',
+      'drives.unmountTitle': '¿Desmontar {letter}:?',
+      'drives.unmountMessage': 'Se cerrará la unidad «{name}».',
+      'drives.unmountPending':
+        'Hay {count} subida(s) pendientes. Se intentará completarlas antes de cerrar.',
+      'drives.unmountWarning':
+        'Los programas que tengan ficheros abiertos en esa unidad perderán el acceso.',
+      'drives.dirCacheCleared': 'Caché de directorios vaciada.',
+      'drives.allMounted': 'Todas las unidades están ya montadas.',
+      'drives.deleteTitle': '¿Eliminar «{name}»?',
+
+      'explorer.colSize': 'Tamaño',
+      'explorer.folderSummary': '{folders} carpeta(s) · {files} fichero(s) · {bytes}',
+      'explorer.deleteTitle': '¿Eliminar {count} elemento(s)?',
+      'explorer.deleteWithFolders':
+        'Entre ellos hay {count} carpeta(s); se borrará todo su contenido.',
+      'explorer.deleteFiles': 'Los ficheros se eliminarán del almacenamiento remoto.',
+      'explorer.renameFolderTitle': 'No disponible aquí',
+      'explorer.renameFolderBody':
+        'Renombrar una carpeta exigiría copiar todos sus objetos. Hazlo desde la unidad montada.',
+      'explorer.usageSummary': '{count} objeto(s) · {bytes} en total bajo este prefijo',
+
+      'logs.emptyDrive': 'Esta unidad no ha registrado nada en esta sesión.',
+      'logs.emptyFilter': 'No hay líneas que encajen con el filtro.',
+      'logs.copied': '{count} línea(s) copiadas.',
+      'logs.clipboardUnavailable': 'El portapapeles no está disponible.',
+
+      'setup.installingBody':
+        'Se están instalando los componentes que necesita la aplicación. Esto sólo ocurre la primera vez.',
+      'setup.uacNotice':
+        'Windows pedirá permiso de administrador para instalar el controlador. Es necesario para crear unidades.',
+      'setup.failed': 'No se pudo completar la preparación.',
+
       /* ---------------------------------------------------------- cache */
       'cache.title': 'Caché local',
       'cache.description':
@@ -581,6 +641,66 @@
       'settings.appLogHint': 'To send to support if something goes wrong.',
       'settings.dpapi': 'Windows DPAPI',
       'settings.cacheFolderHint': 'Files that have been opened or written. It cleans itself.',
+      /* ------------------------------------- main process error codes */
+      'err.winfspMissing':
+        'The drive driver is missing. Install it from Settings → Components.',
+      'err.rcloneMissing':
+        'The transfer engine is missing. Install it from Settings → Components.',
+      'err.dpapiUnavailable':
+        'Windows encryption is unavailable, so the key cannot be stored safely.',
+      'err.cacheNetwork':
+        'That is a network drive: every cached byte would travel back over the wire. Pick a local disk.',
+      'err.cacheOptical': 'That is an optical drive. Pick a local disk.',
+      'err.cacheRemovable':
+        'That is a removable drive and will not always be plugged in. Pick a fixed disk.',
+      'err.cacheFilesystem':
+        'That disk has no sparse file support (FAT or exFAT) and the cache would crawl. Pick an NTFS disk.',
+      'err.cacheOwnMount':
+        'OmniMount serves that letter: the cache would be writing inside the drive it is feeding.',
+      'err.cacheNotWritable': 'That folder cannot be written to.',
+      'err.cacheUnreadable': 'The size of that disk could not be read.',
+      'err.cacheUnknown': 'That disk is not recognised.',
+
+      /* --------------------------------------------- translation sweep */
+      'drives.noneConfigured': 'No drives have been set up yet.',
+      'drives.statCache': 'Local cache',
+      'drives.statMoved': '{bytes} moved',
+      'drives.automatic': 'Automatic',
+      'drives.refreshDirCache': 'Clear directory cache',
+      'drives.mountedTitle': 'Mounted',
+      'drives.mountedBody': 'Drive {letter}: is ready.',
+      'drives.unmountTitle': 'Unmount {letter}:?',
+      'drives.unmountMessage': 'The drive "{name}" will be closed.',
+      'drives.unmountPending':
+        '{count} upload(s) are still pending. They will be finished before closing if possible.',
+      'drives.unmountWarning':
+        'Any program with files open on that drive will lose access to them.',
+      'drives.dirCacheCleared': 'Directory cache cleared.',
+      'drives.allMounted': 'Every drive is already mounted.',
+      'drives.deleteTitle': 'Delete "{name}"?',
+
+      'explorer.colSize': 'Size',
+      'explorer.folderSummary': '{folders} folder(s) · {files} file(s) · {bytes}',
+      'explorer.deleteTitle': 'Delete {count} item(s)?',
+      'explorer.deleteWithFolders':
+        '{count} of them are folders; everything inside will be deleted too.',
+      'explorer.deleteFiles': 'The files will be removed from the remote storage.',
+      'explorer.renameFolderTitle': 'Not available here',
+      'explorer.renameFolderBody':
+        'Renaming a folder would mean copying every object inside it. Do it from the mounted drive.',
+      'explorer.usageSummary': '{count} object(s) · {bytes} in total under this prefix',
+
+      'logs.emptyDrive': 'This drive has not logged anything this session.',
+      'logs.emptyFilter': 'No lines match the filter.',
+      'logs.copied': '{count} line(s) copied.',
+      'logs.clipboardUnavailable': 'The clipboard is not available.',
+
+      'setup.installingBody':
+        'The components the application needs are being installed. This only happens the first time.',
+      'setup.uacNotice':
+        'Windows will ask for administrator permission to install the driver. It is needed to create drives.',
+      'setup.failed': 'Setting up could not be completed.',
+
       'cache.title': 'Local cache',
       'cache.description':
         'Files you open or write go through the disk. It is what makes the drive behave like a disk rather than a network folder.',

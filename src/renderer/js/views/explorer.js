@@ -282,7 +282,7 @@
         },
       }),
       h('div', t('explorer.nombre')),
-      h('div', { style: { textAlign: 'right' } }, 'Tamaño'),
+      h('div', { style: { textAlign: 'right' } }, t('explorer.colSize')),
       h('div', t('explorer.modificado')),
       h('div'),
     ]);
@@ -395,7 +395,11 @@
     const bytes = view.entries.reduce((sum, x) => sum + (x.size || 0), 0);
 
     mount(footNode, [
-      h('span', statusText || `${folders} carpeta(s) · ${files} fichero(s) · ${fmt.bytes(bytes)}`),
+      h(
+        'span',
+        statusText ||
+          t('explorer.folderSummary', { folders, files, bytes: fmt.bytes(bytes) })
+      ),
       h('div.row', [
         view.truncated ? h('span.badge.badge--neutral', t('explorer.listadoParcial')) : null,
         h(
@@ -489,10 +493,10 @@
 
     const folders = items.filter((x) => x.type === 'folder');
     const confirmed = await modal.confirm({
-      title: `¿Eliminar ${items.length} elemento(s)?`,
+      title: t('explorer.deleteTitle', { count: items.length }),
       message: folders.length
-        ? `Entre ellos hay ${folders.length} carpeta(s); se borrará todo su contenido.`
-        : 'Los ficheros se eliminarán del almacenamiento remoto.',
+        ? t('explorer.deleteWithFolders', { count: folders.length })
+        : t('explorer.deleteFiles'),
       detail: t('explorer.estaAccionNoSe'),
       confirmLabel: t('explorer.eliminar'),
       danger: true,
@@ -549,8 +553,8 @@
 
     if (item.type === 'folder') {
       toast.info(
-        'Renombrar una carpeta exigiría copiar todos sus objetos. Hazlo desde la unidad montada.',
-        'No disponible aquí'
+        t('explorer.renameFolderBody'),
+        t('explorer.renameFolderTitle')
       );
       return;
     }
@@ -594,7 +598,10 @@
         return;
       }
       paintFoot(
-        `${fmt.number(usage.count)} objeto(s) · ${fmt.bytes(usage.bytes)} en total bajo este prefijo`
+        t('explorer.usageSummary', {
+          count: fmt.number(usage.count),
+          bytes: fmt.bytes(usage.bytes),
+        })
       );
     });
   }

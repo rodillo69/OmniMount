@@ -698,7 +698,7 @@
           global.OM.brand.mark(30, 'var(--accent)'),
           h('div', [
             h('div.card__title', 'OmniMount'),
-            h('div.card__desc', `Versión ${info.version || '—'}`),
+            h('div.card__desc', `${t('settings.version')} ${info.version || '—'}`),
           ]),
         ]),
         h('div.row', [

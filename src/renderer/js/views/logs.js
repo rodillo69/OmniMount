@@ -168,8 +168,8 @@
           h(
             'p.empty__text',
             view.filter === 'all'
-              ? 'Esta unidad no ha registrado nada en esta sesión.'
-              : 'No hay líneas que encajen con el filtro.'
+              ? t('logs.emptyDrive')
+              : t('logs.emptyFilter')
           ),
         ]),
       ]);
@@ -236,9 +236,9 @@
     }
     try {
       await navigator.clipboard.writeText(text);
-      toast.ok(`${visible().length} línea(s) copiadas.`);
+      toast.ok(t('logs.copied', { count: visible().length }));
     } catch {
-      toast.error('El portapapeles no está disponible.');
+      toast.error(t('logs.clipboardUnavailable'));
     }
   }
 

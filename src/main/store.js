@@ -62,7 +62,9 @@ async function encryptionAvailable() {
 async function sealSecret(plain) {
   if (!plain) return null;
   if (!(await encryptionAvailable())) {
-    throw new Error('El cifrado de Windows no está disponible, no se puede guardar la clave secreta.');
+    const unavailable = new Error('Windows encryption is unavailable.');
+    unavailable.code = 'DPAPI_UNAVAILABLE';
+    throw unavailable;
   }
   const encrypted = await safeStorage.encryptStringAsync(plain);
   return { v: 2, enc: Buffer.from(encrypted).toString('base64') };

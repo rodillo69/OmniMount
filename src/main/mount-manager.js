@@ -212,7 +212,11 @@ class MountManager extends EventEmitter {
 
     const status = await deps.checkAll();
     if (!status.winfsp.installed) {
-      throw new Error('Falta el controlador de unidad. Instálalo desde Ajustes > Componentes.');
+      // The message is a fallback for a log or a console; what the user sees
+      // is the translation the renderer picks from the code.
+      const missing = new Error('WinFsp is not installed.');
+      missing.code = 'WINFSP_MISSING';
+      throw missing;
     }
     if (!status.winfsp.ready) {
       throw new Error(
@@ -220,7 +224,9 @@ class MountManager extends EventEmitter {
       );
     }
     if (!status.rclone.installed) {
-      throw new Error('Falta el motor de transferencia. Instálalo desde Ajustes > Componentes.');
+      const missing = new Error('rclone is not installed.');
+      missing.code = 'RCLONE_MISSING';
+      throw missing;
     }
 
     // A letter that already resolves cannot be used, but if it is one of ours

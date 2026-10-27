@@ -32,7 +32,7 @@
         h('h1.setup__title', t('setup.unMomentoEstamosDejandolo')),
         h(
           'p.setup__text',
-          'Se están instalando los componentes que necesita la aplicación. Esto sólo ocurre la primera vez.'
+          t('setup.installingBody')
         ),
         stepsNode,
         h('div.progress.setup__progress', barNode),
@@ -72,7 +72,7 @@
             icon('shield', 15),
             h(
               'span',
-              'Windows pedirá permiso de administrador para instalar el controlador. Es necesario para crear unidades.'
+              t('setup.uacNotice')
             ),
           ])
         : null,
@@ -149,7 +149,7 @@
     mount(messageNode, [
       h('div.setup__error', [
         icon('alert', 16),
-        h('span.selectable', message || 'No se pudo completar la preparación.'),
+        h('span.selectable', message || t('setup.failed')),
       ]),
     ]);
 

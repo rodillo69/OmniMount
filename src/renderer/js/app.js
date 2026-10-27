@@ -37,10 +37,24 @@
    */
   // Failures the main process raises with a code have a translated text here.
   // Everything else falls back to the message it sent.
+  // Errors from the main process travel as a code, not as a sentence: the
+  // main process has no translation catalogue, and a message written there
+  // would always come out in one language whatever the user picked.
   const CODE_TEXT = {
     ELEVATED: 'elevation.mountBlocked',
     NEEDS_ADMIN: 'setup.necesitaAdministrador',
     UAC_DECLINED: 'setup.permisoRechazado',
+    WINFSP_MISSING: 'err.winfspMissing',
+    RCLONE_MISSING: 'err.rcloneMissing',
+    DPAPI_UNAVAILABLE: 'err.dpapiUnavailable',
+    CACHE_NETWORK: 'err.cacheNetwork',
+    CACHE_OPTICAL: 'err.cacheOptical',
+    CACHE_REMOVABLE: 'err.cacheRemovable',
+    CACHE_FILESYSTEM: 'err.cacheFilesystem',
+    CACHE_OWNMOUNT: 'err.cacheOwnMount',
+    CACHE_NOTWRITABLE: 'err.cacheNotWritable',
+    CACHE_UNREADABLE: 'err.cacheUnreadable',
+    CACHE_UNKNOWN: 'err.cacheUnknown',
   };
 
   async function call(promise, options) {

@@ -448,7 +448,7 @@ function register() {
 
     const verdict = await volumes.canHoldCache(path.join(wanted, 'omnimount-cache'), busy);
     if (!verdict.ok) {
-      const err = new Error(`No se puede usar esa ubicación para la caché (${verdict.reason}).`);
+      const err = new Error(`That location cannot hold the cache (${verdict.reason}).`);
       err.code = `CACHE_${verdict.reason.toUpperCase()}`;
       throw err;
     }

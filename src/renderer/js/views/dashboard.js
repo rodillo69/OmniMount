@@ -44,7 +44,7 @@
             'p.view__sub',
             mounts.length
               ? t('drives.subtitle')
-              : 'Todavía no hay ninguna unidad configurada.'
+              : t('drives.noneConfigured')
           ),
         ]),
         h('div.view__actions', [
@@ -115,7 +115,11 @@
         summary.errored ? `${summary.errored} con error` : 'activas ahora'
       ),
       statTile('Transferencia', ...splitValue(fmt.speed(speed)), 'en este momento'),
-      statTile('Caché local', ...splitValue(fmt.bytes(cached)), `${fmt.bytes(moved)} movidos`),
+      statTile(
+        t('drives.statCache'),
+        ...splitValue(fmt.bytes(cached)),
+        t('drives.statMoved', { bytes: fmt.bytes(moved) })
+      ),
     ]);
   }
 
@@ -218,7 +222,7 @@
               ? h('span.badge.badge--neutral', [icon('lock', 12), 'Solo lectura'])
               : null,
             mountCfg.autoMount
-              ? h('span.badge.badge--brand', [icon('power', 12), 'Automática'])
+              ? h('span.badge.badge--brand', [icon('power', 12), t('drives.automatic')])
               : null,
           ]),
         ]),
@@ -279,7 +283,7 @@
       primary,
       iconBtn('external', 'Abrir en el Explorador', () => open(id), !isMounted),
       iconBtn('rotate', 'Volver a montar', (e) => doRemount(id, e.currentTarget), !isMounted || isBusy),
-      iconBtn('refresh', 'Vaciar caché de directorios', (e) => doRefresh(id, e.currentTarget), !isMounted),
+      iconBtn('refresh', t('drives.refreshDirCache'), (e) => doRefresh(id, e.currentTarget), !isMounted),
       iconBtn('terminal', 'Ver el registro', () => app().navigate('logs', { mountId: id })),
       iconBtn('edit', 'Editar la unidad', () => global.OM.driveForm.open({ editId: id }), isMounted),
       iconBtn('trash', 'Eliminar la unidad', () => remove(card.config)),
@@ -368,7 +372,10 @@
       const result = await app().call(app().api.mounts.mount(id));
       if (result) {
         const cfg = app().state.mounts.find((m) => m.id === id);
-        toast.ok(`La unidad ${cfg ? cfg.driveLetter : ''}: está disponible.`, 'Montada');
+        toast.ok(
+          t('drives.mountedBody', { letter: cfg ? cfg.driveLetter : '' }),
+          t('drives.mountedTitle')
+        );
       }
     });
   }
@@ -379,11 +386,11 @@
       const stats = app().state.stats[id];
       const pending = stats && stats.cache ? stats.cache.uploadsQueued + stats.cache.uploadsInProgress : 0;
       const confirmed = await modal.confirm({
-        title: `¿Desmontar ${cfg ? cfg.driveLetter : ''}:?`,
-        message: `Se cerrará la unidad "${cfg ? cfg.name : ''}".`,
+        title: t('drives.unmountTitle', { letter: cfg ? cfg.driveLetter : '' }),
+        message: t('drives.unmountMessage', { name: cfg ? cfg.name : '' }),
         detail: pending
-          ? `Hay ${pending} subida(s) pendientes. Se intentará completarlas antes de cerrar.`
-          : 'Los programas que tengan ficheros abiertos en esa unidad perderán el acceso.',
+          ? t('drives.unmountPending', { count: pending })
+          : t('drives.unmountWarning'),
         confirmLabel: t('drives.desmontar'),
       });
       if (!confirmed) return;
@@ -405,7 +412,7 @@
   async function doRefresh(id, button) {
     await withBusy(button, async () => {
       const result = await app().call(app().api.mounts.refresh(id));
-      if (result) toast.ok('Caché de directorios vaciada.');
+      if (result) toast.ok(t('drives.dirCacheCleared'));
     });
   }
 
@@ -419,7 +426,7 @@
         .filter((m) => app().statusOf(m.id).state !== 'mounted')
         .map((m) => m.id);
       if (!pending.length) {
-        toast.info('Todas las unidades están ya montadas.');
+        toast.info(t('drives.allMounted'));
         return;
       }
       const results = await app().call(app().api.mounts.mountAll(pending));
@@ -436,7 +443,7 @@
 
   async function remove(mountCfg) {
     const confirmed = await modal.confirm({
-      title: `¿Eliminar "${mountCfg.name}"?`,
+      title: t('drives.deleteTitle', { name: mountCfg.name }),
       message: t('drives.seBorraLaConfiguracion'),
       detail: t('drives.removeDetail'),
       confirmLabel: t('drives.eliminar'),

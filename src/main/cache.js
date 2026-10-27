@@ -59,10 +59,6 @@ function reserveGB(volume) {
  * until the disk is needed and the least recently used copies are evicted to
  * maintain the reserve above.
  */
-function retentionDays() {
-  return profiles.resolve(store.getSettings()).tuning.retentionDays;
-}
-
 /** The configured cache root, or the default beside the application data. */
 function root() {
   const configured = (store.getSettings().cacheLocation || '').trim();
@@ -230,5 +226,4 @@ module.exports = {
   pendingUploads,
   remove,
   reserveGB,
-  retentionDays,
 };
