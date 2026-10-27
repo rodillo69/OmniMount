@@ -12,10 +12,10 @@ hay nada que sincronizar ni que subir a mano.
 
 ## Descarga
 
-**[Descargar OmniMount 1.3.0 para Windows](https://github.com/rodillo69/OmniMount/releases/latest/download/OmniMount-Setup-1.3.0.exe)** · 116 MB · Windows 10 u 11, 64 bits
+**[Descargar OmniMount para Windows](https://github.com/rodillo69/OmniMount/releases/latest)** · 116 MB · Windows 10 u 11, 64 bits
 
-La versión más reciente está siempre en la [página de versiones](https://github.com/rodillo69/OmniMount/releases/latest).
-Una vez instalado, el programa se actualiza solo.
+Ese enlace lleva siempre a la versión más reciente; el instalador es el `.exe` que aparece debajo. Una vez
+instalada, la aplicación comprueba si hay versión nueva al abrirse y una vez por hora, y te avisa cuando la hay.
 
 > **Windows te avisará la primera vez.**
 > El instalador no está firmado con un certificado comercial, así que

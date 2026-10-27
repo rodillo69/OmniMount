@@ -12,10 +12,10 @@ any disk — there is nothing to sync and nothing to upload by hand.
 
 ## Download
 
-**[Download OmniMount 1.3.0 for Windows](https://github.com/rodillo69/OmniMount/releases/latest/download/OmniMount-Setup-1.3.0.exe)** · 116 MB · Windows 10 or 11, 64-bit
+**[Download OmniMount for Windows](https://github.com/rodillo69/OmniMount/releases/latest)** · 116 MB · Windows 10 or 11, 64-bit
 
-The newest version is always on the [releases page](https://github.com/rodillo69/OmniMount/releases/latest).
-Once installed, the app updates itself.
+That link always points at the newest release; the installer is the `.exe` listed under it. Once installed, the
+application checks for a new version when it opens and once an hour, and tells you when there is one.
 
 > **Windows will warn you the first time.**
 > The installer is not signed with a commercial certificate, so SmartScreen
