@@ -157,10 +157,23 @@ function register() {
   }));
 
   handle('app:relaunchUnelevated', async () => {
-    await elevation.relaunchUnelevated();
+    // The lock goes first. The copy Explorer is about to start asks for it
+    // before it opens a window, and this process still holds it for as long
+    // as it takes to exit — so without this the new copy would see a running
+    // instance, quit, and the button would appear to do nothing.
+    app.releaseSingleInstanceLock();
+
+    try {
+      await elevation.relaunchUnelevated();
+    } catch (err) {
+      // Nothing was started, so this copy takes the lock back rather than
+      // leaving the next launch to fight a process that no longer owns it.
+      app.requestSingleInstanceLock();
+      throw err;
+    }
+
     // Nothing is mounted at this point, so there is nothing to flush. The
-    // delay only gives Explorer time to pick the request up before this
-    // process, and the single-instance lock with it, goes away.
+    // delay only lets the reply reach the window before the process goes.
     setTimeout(() => app.exit(0), 700);
     return true;
   });
