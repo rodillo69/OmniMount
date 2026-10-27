@@ -28,6 +28,15 @@ contextBridge.exposeInMainWorld('omni', {
     onProgress: (cb) => subscribe('deps:progress', cb),
   },
 
+  cache: {
+    volumes: () => invoke('cache:volumes'),
+    state: () => invoke('cache:state'),
+    choose: () => invoke('cache:choose'),
+    setLocation: (target) => invoke('cache:setLocation', target),
+    setLimit: (gb) => invoke('cache:setLimit', gb),
+    clear: () => invoke('cache:clear'),
+  },
+
   settings: {
     get: () => invoke('settings:get'),
     update: (patch) => invoke('settings:update', patch),

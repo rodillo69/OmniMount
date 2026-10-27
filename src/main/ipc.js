@@ -9,6 +9,8 @@ const remoteFs = require('./remote-fs');
 const updater = require('./updater');
 const drives = require('./drives');
 const elevation = require('./elevation');
+const volumes = require('./volumes');
+const cache = require('./cache');
 const defaults = require('./defaults');
 const rclone = require('./rclone');
 const mounts = require('./mount-manager');
@@ -388,6 +390,98 @@ function register() {
    * Regiones disponibles y qué claves hay guardadas en cada una. El alta usa
    * esto para pedir credenciales sólo cuando la región elegida no las tiene.
    */
+  /* ------------------------------------------------------------- cache */
+
+  handle('cache:volumes', async () => ({
+    volumes: await volumes.list(),
+    // The letters OmniMount is serving: caching onto one of those would have
+    // the cache written into the filesystem it is backing.
+    inUse: store
+      .listMounts()
+      .filter((m) => mounts.status(m.id).state === 'mounted')
+      .map((m) => m.driveLetter),
+  }));
+
+  handle('cache:state', async () => {
+    const settings = store.getSettings();
+    const root = cache.root();
+    const volume = await volumes.forPath(root);
+    return {
+      root,
+      volume,
+      location: settings.cacheLocation || '',
+      limitGB: Number(settings.cacheLimitGB) || 0,
+      reserveGB: cache.reserveGB(volume),
+      usage: cache.usage(),
+    };
+  });
+
+  handle('cache:choose', async () => {
+    const window_ = getWindow();
+    const picked = await dialog.showOpenDialog(window_, {
+      title: 'Dónde guardar la caché',
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    if (picked.canceled || !picked.filePaths.length) return { cancelled: true };
+    return { cancelled: false, path: picked.filePaths[0] };
+  });
+
+  handle('cache:setLocation', async (target) => {
+    const wanted = String(target || '').trim();
+
+    if (!wanted) {
+      store.updateSettings({ cacheLocation: '' });
+      return { ok: true, root: cache.root() };
+    }
+
+    const busy = store
+      .listMounts()
+      .filter((m) => mounts.status(m.id).state === 'mounted')
+      .map((m) => m.driveLetter);
+
+    const verdict = await volumes.canHoldCache(path.join(wanted, 'omnimount-cache'), busy);
+    if (!verdict.ok) {
+      const err = new Error(`No se puede usar esa ubicación para la caché (${verdict.reason}).`);
+      err.code = `CACHE_${verdict.reason.toUpperCase()}`;
+      throw err;
+    }
+
+    store.updateSettings({ cacheLocation: path.join(wanted, 'omnimount-cache') });
+    return { ok: true, root: cache.root(), volume: verdict.volume };
+  });
+
+  handle('cache:setLimit', (gb) => {
+    const value = Number(gb);
+    store.updateSettings({ cacheLimitGB: Number.isFinite(value) && value > 0 ? value : 0 });
+    return { limitGB: Number(store.getSettings().cacheLimitGB) || 0 };
+  });
+
+  /**
+   * Clear the cache of every drive that is not mounted.
+   *
+   * A mounted drive is left alone: its cache is in active use, and rclone
+   * owns those files. Anything still waiting to be uploaded is refused too —
+   * that data is on this disk and nowhere else.
+   */
+  handle('cache:clear', () => {
+    const cleared = [];
+    const skipped = [];
+
+    for (const mount of store.listMounts()) {
+      if (mounts.status(mount.id).state !== 'unmounted') {
+        skipped.push({ name: mount.name, reason: 'mounted' });
+        continue;
+      }
+      const result = cache.remove(mount.id);
+      if (result.removed) cleared.push(mount.name);
+      else if (result.pending > 0) {
+        skipped.push({ name: mount.name, reason: 'pending', pending: result.pending });
+      }
+    }
+
+    return { cleared, skipped, usage: cache.usage() };
+  });
+
   /* ----------------------------------------------------------- updates */
 
   updater.register(send);
@@ -445,6 +539,19 @@ function register() {
       await mounts.unmount(id);
     }
     store.deleteMount(id);
+
+    // The cache folder outlived the drive it belonged to, with nothing left
+    // naming it: a per-drive cache quietly holding gigabytes nobody could
+    // connect to anything. It goes with the drive.
+    try {
+      const result = cache.remove(id, { force: true });
+      if (result.pending > 0) {
+        log.warn(`La unidad ${id} se borró con ${result.pending} ficheros sin subir.`);
+      }
+    } catch (err) {
+      log.warn(`No se pudo borrar la caché de ${id}:`, err.message);
+    }
+
     return true;
   });
 

@@ -22,6 +22,12 @@ const DEFAULTS = {
     mountOnStart: true,
     closeToTray: true,
     confirmUnmount: true,
+    // Empty keeps the cache beside the application's data. A path puts it on
+    // another disk, which is what a small system drive usually wants.
+    cacheLocation: '',
+    // Zero lets the cache use what is spare, held back only by the free
+    // space rclone is told to maintain. A number is a hard ceiling in GB.
+    cacheLimitGB: 0,
   },
   connections: [],
   mounts: [],

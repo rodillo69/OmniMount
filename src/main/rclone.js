@@ -114,20 +114,35 @@ function freePort() {
 
 /* ------------------------------------------------------------- mount args */
 
-function cacheModeFlags(mount) {
+/**
+ * Cache flags, from a plan worked out against the disk the cache sits on.
+ *
+ * `--vfs-cache-min-free-space` is the one that matters. A fixed ceiling is
+ * the wrong shape for a cache: whatever number is right for this disk today
+ * is wrong once it fills up, and wrong again on the next machine. Told to
+ * keep an amount of the disk free, rclone evicts least-recently-used files
+ * to maintain it — so the cache uses what is spare and retreats when the
+ * disk is needed, without anyone picking a figure.
+ *
+ * A ceiling is still applied when the user asked for one.
+ */
+function cacheModeFlags(mount, plan) {
   const flags = ['--vfs-cache-mode', mount.cacheMode];
-  if (mount.cacheMode === 'writes' || mount.cacheMode === 'full') {
-    flags.push(
-      '--vfs-cache-max-size',
-      `${mount.cacheMaxSizeGB}G`,
-      '--vfs-cache-max-age',
-      `${mount.cacheMaxAgeHours}h`,
-      // Per-mount cache directory: the remote name is shared, so without this
-      // two mounts of different buckets would write into the same cache tree.
-      '--cache-dir',
-      mountCacheDir(mount.id)
-    );
+  if (mount.cacheMode !== 'writes' && mount.cacheMode !== 'full') return flags;
+
+  flags.push('--vfs-cache-max-age', `${mount.cacheMaxAgeHours}h`);
+
+  if (plan && plan.minFreeSpaceGB > 0) {
+    flags.push('--vfs-cache-min-free-space', `${plan.minFreeSpaceGB}G`);
   }
+
+  const ceiling = plan ? plan.maxSizeGB : mount.cacheMaxSizeGB;
+  if (ceiling > 0) flags.push('--vfs-cache-max-size', `${ceiling}G`);
+
+  // Per-mount cache directory: the remote name is shared, so without this
+  // two mounts of different buckets would write into the same cache tree.
+  flags.push('--cache-dir', (plan && plan.dir) || mountCacheDir(mount.id));
+
   return flags;
 }
 
@@ -156,7 +171,8 @@ function volumeName(mount) {
   return mount.networkMode ? `\\\\OmniMount\\${label || 'Remote'}` : label;
 }
 
-function buildMountArgs(mount, rc, globalExtraFlags = '') {
+function buildMountArgs(mount, rc, options = {}) {
+  const { cache: cachePlan = null, globalExtraFlags = '' } = options;
   const args = [
     'mount',
     remotePath(mount),
@@ -173,7 +189,7 @@ function buildMountArgs(mount, rc, globalExtraFlags = '') {
     args.push('--vfs-disk-space-total-size', `${mount.reportedSizeTB}T`);
   }
 
-  args.push(...cacheModeFlags(mount));
+  args.push(...cacheModeFlags(mount, cachePlan));
   args.push(
     '--dir-cache-time',
     `${mount.dirCacheSeconds}s`,

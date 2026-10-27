@@ -2,11 +2,12 @@
 const fs = require('node:fs');
 const { EventEmitter } = require('node:events');
 const { spawn, execFile } = require('node:child_process');
-const { rcloneExe, mountCacheDir } = require('./paths');
+const { rcloneExe } = require('./paths');
 const rclone = require('./rclone');
 const drives = require('./drives');
 const deps = require('./deps');
 const elevation = require('./elevation');
+const cache = require('./cache');
 const store = require('./store');
 const log = require('./logger').scoped('mounts');
 
@@ -120,11 +121,30 @@ class MountManager extends EventEmitter {
       }
 
       const rc = rclone.newRcSession(await rclone.freePort());
-      const args = rclone.buildMountArgs(mount, rc);
+      // Worked out now, against the disk as it is, not when the drive was
+      // created: free space is a fact about today, not a setting.
+      const plan = await cache.plan(mount.id);
+      const args = rclone.buildMountArgs(mount, rc, { cache: plan });
       const env = await rclone.buildEnv(connection);
 
       if (mount.cacheMode === 'writes' || mount.cacheMode === 'full') {
-        fs.mkdirSync(mountCacheDir(mount.id), { recursive: true });
+        try {
+          fs.mkdirSync(plan.dir, { recursive: true });
+        } catch (err) {
+          // A cache folder that cannot be created is usually a disk that was
+          // chosen once and has since been unplugged. Saying which folder
+          // turns an unexplained mount failure into an obvious one.
+          throw new Error(
+            `No se pudo preparar la caché en ${plan.dir}: ${err.message}. Revisa dónde se guarda la caché en Ajustes.`
+          );
+        }
+        this.appendLog(
+          mountId,
+          plan.automatic
+            ? `Caché en ${plan.dir} (automática, dejando ${plan.minFreeSpaceGB} GB libres en el disco).`
+            : `Caché en ${plan.dir} (máximo ${plan.maxSizeGB} GB, dejando ${plan.minFreeSpaceGB} GB libres).`,
+          'system'
+        );
       }
 
       // `root` is the generic name for the bucket, container, share or folder;
