@@ -31,10 +31,10 @@
       ]),
 
       h('div.stack.stack--lg', [
-        card('Apariencia', null, [
+        card(t('settings.appearance'), null, [
           setting(
-            'Tema',
-            'El modo sistema sigue a la configuración de Windows.',
+            t('settings.theme'),
+            t('settings.themeHint'),
             h(
               'div.segmented',
               THEMES.map((theme) =>
@@ -48,23 +48,23 @@
           ),
         ]),
 
-        card('Arranque', 'Qué hace la aplicación al iniciarse y al cerrarla.', [
-          switchRow('Iniciar con Windows', settings.autostart, (v) => update({ autostart: v }), {
+        card(t('settings.startup'), t('settings.startupHint'), [
+          switchRow(t('settings.startWithWindows'), settings.autostart, (v) => update({ autostart: v }), {
             hint: t('settings.lasUnidadesEstaranDisponibles'),
           }),
           switchRow(
-            'Arrancar en segundo plano',
+            t('settings.startInBackground'),
             settings.startMinimized,
             (v) => update({ startMinimized: v }),
             { hint: t('settings.sinAbrirLaVentana') }
           ),
           switchRow(
-            'Montar las unidades automáticas al abrir',
+            t('settings.mountOnOpen'),
             settings.mountOnStart,
             (v) => update({ mountOnStart: v })
           ),
           switchRow(
-            'Al cerrar la ventana, seguir en segundo plano',
+            t('settings.closeToTray'),
             settings.closeToTray,
             (v) => update({ closeToTray: v }),
             {
@@ -73,18 +73,190 @@
             }
           ),
           switchRow(
-            'Pedir confirmación al desmontar',
+            t('settings.confirmUnmount'),
             settings.confirmUnmount,
             (v) => update({ confirmUnmount: v })
           ),
         ]),
 
         keysCard(),
+        cacheCard(),
         componentsCard(),
         maintenanceCard(info),
         aboutCard(info),
       ]),
     ]);
+  }
+
+  /* ------------------------------------------------------------ cache */
+
+  // Filled by loadCache() and repainted in place, so opening Settings does
+  // not block on walking the cache folder.
+  let cacheState = null;
+
+  function cacheCard() {
+    const body = h('div.settings-group');
+    paintCache(body);
+    loadCache(body);
+    return h('div.card', [
+      h('div.card__head', [
+        h('div', [
+          h('div.card__title', t('cache.title')),
+          h('div.card__desc', t('cache.description')),
+        ]),
+      ]),
+      h('div.card__body', body),
+    ]);
+  }
+
+  async function loadCache(body) {
+    cacheState = await app().call(app().api.cache.state(), { silent: true });
+    paintCache(body);
+  }
+
+  function paintCache(body) {
+    if (!cacheState) {
+      OM.dom.mount(body, [h('div.setting__hint', t('cache.reading'))]);
+      return;
+    }
+
+    const fmt = global.OM.fmt;
+    const volume = cacheState.volume;
+    const automatic = cacheState.limitGB <= 0;
+
+    // What it is doing right now, in one line, before any control. The
+    // numbers are the point: a cache setting with no figures beside it is
+    // just a box to guess at.
+    const where = volume
+      ? t('cache.onVolume', {
+          letter: volume.letter,
+          label: volume.label || volume.filesystem,
+          free: fmt.bytes(volume.free),
+        })
+      : cacheState.root;
+
+    const rows = [
+      setting(
+        t('cache.location'),
+        where,
+        h('div.row', { style: { gap: 'var(--sp-2)' } }, [
+          h(
+            'button.btn.btn--ghost.btn--sm',
+            { type: 'button', onclick: () => chooseLocation(body) },
+            [icon('folder', 14, 'btn__icon'), h('span', t('cache.change'))]
+          ),
+          cacheState.location
+            ? h(
+                'button.btn.btn--ghost.btn--sm',
+                { type: 'button', onclick: () => setLocation(body, '') },
+                t('cache.useDefault')
+              )
+            : null,
+        ])
+      ),
+
+      setting(
+        t('cache.size'),
+        automatic
+          ? t('cache.sizeAutoHint', { reserve: cacheState.reserveGB })
+          : t('cache.sizeFixedHint', { limit: cacheState.limitGB, reserve: cacheState.reserveGB }),
+        h('div.row', { style: { gap: 'var(--sp-2)', alignItems: 'center' } }, [
+          h(
+            'div.segmented',
+            [
+              h(
+                `button.segmented__item${automatic ? '.is-active' : ''}`,
+                { type: 'button', onclick: () => setLimit(body, 0) },
+                t('cache.automatic')
+              ),
+              h(
+                `button.segmented__item${automatic ? '' : '.is-active'}`,
+                { type: 'button', onclick: () => setLimit(body, cacheState.limitGB || 20) },
+                t('cache.fixed')
+              ),
+            ]
+          ),
+          automatic
+            ? null
+            : h('input.input', {
+                type: 'number',
+                min: '1',
+                step: '1',
+                value: cacheState.limitGB,
+                style: { width: '92px' },
+                onchange: (e) => setLimit(body, Number(e.target.value)),
+              }),
+          automatic ? null : h('span.setting__hint', 'GB'),
+        ])
+      ),
+
+      setting(
+        t('cache.used'),
+        t('cache.usedHint'),
+        h('div.row', { style: { gap: 'var(--sp-3)', alignItems: 'center' } }, [
+          h('strong', fmt.bytes(cacheState.usage.total)),
+          h(
+            'button.btn.btn--ghost.btn--sm',
+            { type: 'button', onclick: () => clearCache(body) },
+            [icon('trash', 14, 'btn__icon'), h('span', t('cache.clear'))]
+          ),
+        ])
+      ),
+    ];
+
+    OM.dom.mount(body, rows);
+  }
+
+  async function chooseLocation(body) {
+    const picked = await app().call(app().api.cache.choose(), { silent: true });
+    if (!picked || picked.cancelled) return;
+    await setLocation(body, picked.path);
+  }
+
+  async function setLocation(body, target) {
+    const result = await app().call(app().api.cache.setLocation(target), {});
+    if (!result) return;
+    toast.ok(target ? t('cache.moved') : t('cache.movedDefault'));
+    // Existing drives keep using the old folder until they are remounted:
+    // rclone is told the cache directory once, when it starts.
+    if (app().state.mounts.some((m) => app().statusOf(m.id).state === 'mounted')) {
+      toast.warn(t('cache.remountNeeded'));
+    }
+    await loadCache(body);
+  }
+
+  async function setLimit(body, gb) {
+    const result = await app().call(app().api.cache.setLimit(gb), { silent: true });
+    if (!result) return;
+    cacheState.limitGB = result.limitGB;
+    paintCache(body);
+  }
+
+  async function clearCache(body) {
+    const ok = await modal.confirm({
+      title: t('cache.clearTitle'),
+      message: t('cache.clearMessage'),
+      confirmLabel: t('cache.clear'),
+    });
+    if (!ok) return;
+
+    const result = await app().call(app().api.cache.clear(), {});
+    if (!result) return;
+
+    // Nothing is thrown away silently: a drive left alone is named, with the
+    // reason, because "cleared" over a cache that is still full is worse
+    // than no message at all.
+    for (const skip of result.skipped) {
+      if (skip.reason === 'pending') {
+        toast.warn(t('cache.skippedPending', { name: skip.name, count: skip.pending }));
+      } else {
+        toast.warn(t('cache.skippedMounted', { name: skip.name }));
+      }
+    }
+    if (result.cleared.length) toast.ok(t('cache.cleared', { count: result.cleared.length }));
+    else if (!result.skipped.length) toast.ok(t('cache.alreadyEmpty'));
+
+    await loadCache(body);
   }
 
   /* ----------------------------------------------------------- claves */
@@ -93,8 +265,8 @@
     const keys = app().state.connections.filter((c) => c.hasSecret);
 
     return card(
-      'Claves de acceso',
-      'Las credenciales del almacenamiento remoto, cifradas con Windows.',
+      t('settings.keys'),
+      t('settings.keysHint'),
       keys.length
         ? keys.map((conn) => {
             const usedBy = app().state.mounts.filter((m) => m.connectionId === conn.id);
@@ -125,7 +297,7 @@
                     'div.setting__hint',
                     usedBy.length
                       ? `En uso por ${usedBy.map((m) => `${m.driveLetter}:`).join(', ')}`
-                      : 'Sin unidades asociadas'
+                      : t('settings.noDrivesUsing')
                   ),
                 ]),
               ]),
@@ -149,7 +321,7 @@
           })
         : [
             h('p.muted', { style: { fontSize: 'var(--fs-sm)' } },
-              'Todavía no hay claves guardadas. Se piden al crear la primera unidad.'),
+              t('settings.noKeys')),
           ]
     );
   }
@@ -170,7 +342,7 @@
       if (!saved) return;
       await app().loadConnections();
       app().renderView();
-      toast.ok('Clave actualizada.');
+      toast.ok(t('settings.keyUpdated'));
     });
   }
 
@@ -178,7 +350,7 @@
     if (usedBy.length) {
       toast.warn(
         `La usan las unidades ${usedBy.map((m) => `${m.driveLetter}:`).join(', ')}. Elimínalas primero.`,
-        'Clave en uso'
+        t('settings.keyInUse')
       );
       return;
     }
@@ -195,7 +367,7 @@
     if (!done) return;
     await app().loadConnections();
     app().renderView();
-    toast.ok('Claves eliminadas.');
+    toast.ok(t('settings.keysRemoved'));
   }
 
   /** Host a stored credential belongs to. */
@@ -210,8 +382,8 @@
     const ready = deps && deps.ready;
 
     return card(
-      'Componentes',
-      'Lo que OmniMount instaló para poder crear unidades.',
+      t('settings.components'),
+      t('settings.componentsHint'),
       [
         h('div.setting', [
           h('div.row', { style: { alignItems: 'center', gap: 'var(--sp-3)' } }, [
@@ -232,20 +404,20 @@
               icon(ready ? 'checkCircle' : 'alert', 16)
             ),
             h('div', [
-              h('div.setting__label', ready ? 'Todo instalado' : 'Falta algún componente'),
+              h('div.setting__label', ready ? t('settings.allInstalled') : t('settings.componentMissing')),
               h(
                 'div.setting__hint',
                 deps
                   ? [
                       deps.rclone.installed
                         ? `Motor ${deps.rclone.version}`
-                        : 'Motor no instalado',
+                        : t('settings.engineMissing'),
                       ' · ',
                       deps.winfsp.installed
                         ? `Controlador ${deps.winfsp.version}`
-                        : 'Controlador no instalado',
+                        : t('settings.driverMissing'),
                     ]
-                  : 'Comprobando...'
+                  : t('settings.checking')
               ),
             ]),
           ]),
@@ -253,7 +425,7 @@
             h(
               'button.btn.btn--outline.btn--sm',
               { type: 'button', onclick: (e) => recheck(e.currentTarget) },
-              ready ? 'Comprobar' : 'Instalar ahora'
+              ready ? t('settings.check') : t('settings.installNow')
             ),
           ]),
         ]),
@@ -268,7 +440,7 @@
 
       if (deps && deps.ready) {
         app().renderView();
-        toast.ok('Todos los componentes están instalados.');
+        toast.ok(t('settings.allInstalledToast'));
         return;
       }
       // Falta algo: se instala sin más preguntas, igual que en el primer
@@ -276,7 +448,7 @@
       const ok = await global.OM.app.runSetup();
       await app().loadDeps();
       app().renderView();
-      if (ok) toast.ok('Componentes instalados.');
+      if (ok) toast.ok(t('settings.installedToast'));
     });
   }
 
@@ -286,22 +458,22 @@
   // los parámetros del motor no se exponen a propósito: son el servicio, no
   // una preferencia, y teclear algo distinto sólo rompe todas las unidades.
   function maintenanceCard(info) {
-    return card('Mantenimiento', 'Dónde guarda sus cosas la aplicación.', [
+    return card(t('settings.maintenance'), t('settings.maintenanceHint'), [
       linkRow(
-        'Carpeta de datos',
-        'Configuración y claves cifradas.',
+        t('settings.dataFolder'),
+        t('settings.dataFolderHint'),
         'folder',
         () => app().call(app().api.app.openPath(info.userData))
       ),
       linkRow(
-        'Caché local',
-        'Los ficheros que se han abierto o escrito. Se limpia sola.',
+        t('cache.title'),
+        t('settings.cacheFolderHint'),
         'package',
         () => app().call(app().api.app.openPath(info.cacheDir))
       ),
       linkRow(
-        'Registro de la aplicación',
-        'Para enviar a soporte si algo falla.',
+        t('settings.appLog'),
+        t('settings.appLogHint'),
         'terminal',
         () => app().call(app().api.app.revealLog())
       ),
@@ -394,7 +566,7 @@
           h('dt', t('settings.plataforma')),
           h('dd', `Electron ${info.electron || '—'} · ${info.platform || ''}`),
           h('dt', t('settings.cifradoDeCredenciales')),
-          h('dd', info.encryptionAvailable ? 'DPAPI de Windows' : 'no disponible'),
+          h('dd', info.encryptionAvailable ? t('settings.dpapi') : 'no disponible'),
         ]),
       ]),
       h('div.card__foot', [
