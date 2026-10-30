@@ -1,7 +1,7 @@
 {
   "name": "omnimount",
   "productName": "OmniMount",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "Mount any cloud storage as a local drive",
   "author": {
     "name": "Miguel Cañadas",
