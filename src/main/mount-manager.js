@@ -177,6 +177,9 @@ class MountManager extends EventEmitter {
 
       run.mountedAt = new Date().toISOString();
       run.restartAttempts = 0;
+      // A drive is the proof that the driver loaded: whatever restart the
+      // installer asked for has happened, so stop asking for it.
+      deps.clearRebootPending();
       this.setState(mountId, 'mounted', { error: null });
       this.appendLog(mountId, `Unidad ${mount.driveLetter}: disponible.`, 'system');
 
@@ -218,10 +221,13 @@ class MountManager extends EventEmitter {
       missing.code = 'WINFSP_MISSING';
       throw missing;
     }
-    if (!status.winfsp.ready) {
-      throw new Error(
-        'El controlador de unidad está instalado pero Windows todavía no lo ha cargado. Reinicia el equipo y vuelve a intentarlo.'
-      );
+    // Only when the installer actually asked for a restart. The driver not
+    // being loaded is not a reason to refuse: it is demand-start, and this
+    // mount is what loads it.
+    if (status.winfsp.rebootPending) {
+      const pending = new Error('WinFsp was installed and Windows has not loaded it yet.');
+      pending.code = 'WINFSP_REBOOT';
+      throw pending;
     }
     if (!status.rclone.installed) {
       const missing = new Error('rclone is not installed.');

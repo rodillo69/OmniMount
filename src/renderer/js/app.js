@@ -53,6 +53,7 @@
     WINFSP_MISSING: 'err.winfspMissing',
     RCLONE_MISSING: 'err.rcloneMissing',
     DPAPI_UNAVAILABLE: 'err.dpapiUnavailable',
+    WINFSP_REBOOT: 'err.winfspReboot',
     CACHE_NETWORK: 'err.cacheNetwork',
     CACHE_OPTICAL: 'err.cacheOptical',
     CACHE_REMOVABLE: 'err.cacheRemovable',

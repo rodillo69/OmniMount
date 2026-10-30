@@ -9,6 +9,7 @@ const { app } = require('electron');
 const { execFile } = require('node:child_process');
 const { dirs, rcloneExe } = require('./paths');
 const elevation = require('./elevation');
+const store = require('./store');
 const log = require('./logger').scoped('deps');
 
 // Los dos componentes viajan dentro del instalador, así que el primer arranque
@@ -65,24 +66,33 @@ function existsQuietly(candidate) {
 }
 
 /**
- * Ask the driver itself whether it is loaded.
+ * Ask the driver whether it is loaded right now.
  *
- * Files on disk and a registry key only prove that an installer ran. The
- * kernel driver is a separate thing, registered under a side-by-side name
- * that carries a build timestamp (WinFsp+20261023T124309Z on this machine), so
- * there is no fixed service name to query. `fsptool lsvol` asks the driver to
- * list its volumes, which it can only answer if it is actually loaded, and
- * needs no privileges to do it.
+ * `fsptool lsvol` asks the file system driver to list its volumes, which it
+ * can only answer if it is loaded, and needs no privileges to do it.
  *
- * This is the difference between "WinFsp is installed" and "mounting will
- * work" — and it is the gap a freshly installed driver awaiting a reboot falls
- * into.
+ * What this does NOT mean is "mounting will work", and an earlier version of
+ * this file read it that way. The WinFsp driver is registered demand-start
+ * (`Start=3`): Windows does not load it when the machine boots, it loads it
+ * when something asks for a file system — which is what mounting does. So a
+ * machine that has just started answers "not loaded" and mounts perfectly a
+ * second later.
+ *
+ * Treating that answer as a fault produced a message telling the user to
+ * restart, and restarting put them straight back into it: the application
+ * starts with Windows, asks before anything has mounted, and gets the same
+ * answer. The way out of that loop is not to ask this question before
+ * mounting. It is kept for diagnosis, and for the one case where it means
+ * something: the minutes after the installer has run and said 3010.
  */
-function driverResponds(fsptool) {
+function probeDriver(fsptool) {
   return new Promise((resolve) => {
-    execFile(fsptool, ['lsvol'], { timeout: 10000, windowsHide: true }, (err) =>
-      resolve(!err)
-    );
+    execFile(fsptool, ['lsvol'], { timeout: 15000, windowsHide: true }, (err) => {
+      if (!err) return resolve({ loaded: true, reason: null });
+      // A demand-start driver has to be started to answer, and starting it
+      // takes long enough on a busy machine to run out the clock.
+      resolve({ loaded: false, reason: err.killed ? 'timeout' : String(err.code || err.message) });
+    });
   });
 }
 
@@ -103,10 +113,20 @@ async function checkWinFsp() {
     ...WINFSP_BIN_CANDIDATES.map((dir) => path.join(dir, 'fsptool-x64.exe')),
   ].find(existsQuietly);
 
-  // With no way to ask, the files are the best evidence available. Reporting
-  // "not ready" on a missing tool would block a working machine over a
-  // question we simply could not put.
-  const ready = installed && (fsptool ? await driverResponds(fsptool) : true);
+  const probe = fsptool ? await probeDriver(fsptool) : { loaded: null, reason: 'sin fsptool' };
+
+  // A driver that answers has loaded, so any restart the installer asked for
+  // has already happened.
+  if (probe.loaded) clearRebootPending();
+
+  // Only the installer can say a restart is genuinely outstanding, and it
+  // does, with exit code 3010. Anything else is guesswork that costs the user
+  // a reboot that cannot help.
+  const rebootPending = installed && store.getSettings().winfspRebootPending === true;
+
+  // Installed is what decides this. Loading the driver is mounting's job, not
+  // a precondition for it — see probeDriver.
+  const ready = installed && !rebootPending;
 
   return {
     id: 'winfsp',
@@ -114,11 +134,28 @@ async function checkWinFsp() {
     technicalName: 'WinFsp',
     installed,
     ready,
+    rebootPending,
+    // Informational: shown in Settings and written to the log, never used to
+    // refuse a mount.
+    driverLoaded: probe.loaded,
+    driverReason: probe.reason,
     version: version || (installed ? 'instalado' : null),
     path: dll || installDir || null,
     requiresAdmin: true,
     description: 'Permite que el almacenamiento aparezca como una unidad real en el Explorador.',
   };
+}
+
+/**
+ * The driver answered, so whatever the installer asked for has happened.
+ * Called after a probe succeeds and after a mount works, which is the other
+ * proof that it is loaded.
+ */
+function clearRebootPending() {
+  if (store.getSettings().winfspRebootPending) {
+    store.updateSettings({ winfspRebootPending: false });
+    log.info('El controlador respondió: se retira el aviso de reinicio pendiente.');
+  }
 }
 
 function rcloneVersion(exe) {
@@ -408,10 +445,17 @@ async function installWinFsp(onProgress) {
 
   cleanUp();
 
-  // Instalado pero sin responder: el driver se carga al reiniciar. Montar
-  // ahora fallaría, así que se dice aquí y no después, con la unidad a medias.
-  const needsReboot = code === 3010 || !status.ready;
-  log.info('WinFsp instalado, version', status.version, needsReboot ? '(pendiente de reinicio)' : '');
+  // 3010 is Windows telling us a restart is outstanding, and it is the only
+  // thing allowed to decide that. The driver not answering yet is not
+  // evidence of anything: it is demand-start and loads when a drive mounts.
+  const needsReboot = code === 3010;
+  store.updateSettings({ winfspRebootPending: needsReboot });
+
+  log.info(
+    'WinFsp instalado, version', status.version,
+    needsReboot ? '(el instalador pide reinicio: 3010)' : '',
+    status.driverLoaded === false ? `(driver aun no cargado: ${status.driverReason})` : ''
+  );
   report('done', { message: 'Controlador listo.', percent: 100, needsReboot });
   return { ...status, needsReboot };
 }
@@ -438,7 +482,7 @@ async function ensureAll(onProgress) {
   // le falta el reinicio que carga el driver. Volver a pasar el MSI sólo
   // gastaría otro aviso de UAC para acabar igual.
   if (!status.winfsp.installed) pending.push('winfsp');
-  else if (!status.winfsp.ready) needsReboot = true;
+  else if (status.winfsp.rebootPending) needsReboot = true;
 
   let index = 0;
   for (const id of pending) {
@@ -458,6 +502,7 @@ async function ensureAll(onProgress) {
 module.exports = {
   checkAll,
   checkWinFsp,
+  clearRebootPending,
   checkRclone,
   installRclone,
   installWinFsp,

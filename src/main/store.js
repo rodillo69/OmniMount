@@ -45,6 +45,12 @@ const DEFAULTS = {
     // While this is in the future, the notice stays quiet. This is what
     // "remind me later" writes.
     updateSnoozedUntil: 0,
+    // Set only when the WinFsp installer exits with 3010, which is Windows
+    // saying a restart is genuinely outstanding. Cleared as soon as the
+    // driver answers or a drive mounts. Nothing else may set it: guessing
+    // this from a driver that is merely not loaded yet sends the user into
+    // a restart that cannot help, because the driver is demand-start.
+    winfspRebootPending: false,
   },
   connections: [],
   mounts: [],

@@ -225,6 +225,8 @@
       'settings.dpapi': 'DPAPI de Windows',
       'settings.cacheFolderHint': 'Los ficheros que se han abierto o escrito. Se limpia sola.',
       /* --------------------------------- errores del proceso principal */
+      'err.winfspReboot':
+        'El instalador del controlador pidió reiniciar Windows para terminar. Reinicia el equipo y vuelve a intentarlo.',
       'err.winfspMissing':
         'Falta el controlador de unidad. Instálalo desde Ajustes → Componentes.',
       'err.rcloneMissing':
@@ -431,7 +433,7 @@
       'setup.motorDeTransferencia': 'Motor de transferencia',
       'setup.controladorDeUnidad': 'Controlador de unidad',
       'setup.reinicioPendiente':
-        'El controlador quedó instalado, pero Windows lo carga al reiniciar. Reinicia el equipo y vuelve a abrir OmniMount.',
+        'El instalador del controlador pide reiniciar Windows para terminar. Reinicia el equipo y vuelve a abrir OmniMount.',
       'setup.necesitaAdministrador':
         'El controlador de unidad lo tiene que instalar una vez quien administre este equipo: Windows pide credenciales de administrador y esta cuenta no las tiene.',
       'setup.permisoRechazado':
@@ -690,6 +692,8 @@
       'settings.dpapi': 'Windows DPAPI',
       'settings.cacheFolderHint': 'Files that have been opened or written. It cleans itself.',
       /* ------------------------------------- main process error codes */
+      'err.winfspReboot':
+        'The driver installer asked for Windows to be restarted to finish. Restart the computer and try again.',
       'err.winfspMissing':
         'The drive driver is missing. Install it from Settings → Components.',
       'err.rcloneMissing':
@@ -895,7 +899,7 @@
       'setup.motorDeTransferencia': 'Transfer engine',
       'setup.controladorDeUnidad': 'Drive driver',
       'setup.reinicioPendiente':
-        'The driver is installed, but Windows only loads it after a restart. Restart the computer and open OmniMount again.',
+        'The driver installer asked for Windows to be restarted to finish. Restart the computer and open OmniMount again.',
       'setup.necesitaAdministrador':
         'The drive driver has to be installed once by whoever administers this computer: Windows asks for administrator credentials and this account does not have them.',
       'setup.permisoRechazado':
